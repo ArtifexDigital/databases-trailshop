@@ -205,21 +205,23 @@ Answer the following in your own words (write 2–3 sentences per point):
 > [!NOTE]
 > ***Your Answer***
 >
-> _(Write your answer here.)_
+> They would face problems regarding organisation, structure and finding the data and the staff members could easily override things. Last think would be security, because not every staff member should see every information.
 
 2. List **3 benefits** of switching to a database system, explaining how each one solves a problem from your list above.
 
 > [!NOTE]
 > ***Your Answer***
 >
-> _(Write your answer here.)_
+> Organisation: one query can find the data, overwriting: DBMS protects that, security: Through permissions
 
 3. Explain the three-schema architecture in your own words. Why is the separation into three levels useful?
 
 > [!NOTE]
 > ***Your Answer***
 >
-> _(Write your answer here.)_
+> External level is the view level, people only see what the have the permission to. Marketing sees the products and prices, warehouse the stocks and id. Same database, different views. Conceptual level: the structure and how the database is organized, like tables, columns, datatypes. Internal level: thats the physical level you usually not interact with, because the DBMS is doing that for you. Its about file formats, index structures and data compression.
+
+
 
 ---
 
@@ -235,7 +237,7 @@ _(See Section 1 of this week's Theory material.)_
 > [!NOTE]
 > ***Your Answer***
 >
-> _(Write your answer here.)_
+> Data is just numbers and text without context (TV, 30.99, 12), information is the data with context (TV costs 30.99€ and have 12 in stocks)
 
 **Q2.** List and explain three disadvantages of file-based data management systems. For each, describe how it would affect TrailShop specifically.
 _(See Section 2 of this week's Theory material.)_
@@ -243,7 +245,7 @@ _(See Section 2 of this week's Theory material.)_
 > [!NOTE]
 > ***Your Answer***
 >
-> _(Write your answer here.)_
+> 1. Data Redundancy and Inconsistency: data is stored in various files, if one file is updated, the other ones arent automatically --> customer sees product at 20€ (file 1), warehouse ships it with 30€ (file 2) 2. data isolation: data is stored in seperate files, probably in different formats --> if you want to find out, which customer bought the camping gear last month, you have to look in two different files. 3. Security: You cant control, who sees the data easily --> Marketing team needs access to products and prices, but as well sees the margins.
 
 **Q3.** What is a DBMS? List four of its core functions.
 _(See Sections 3 and 4 of this week's Theory material.)_
@@ -251,7 +253,7 @@ _(See Sections 3 and 4 of this week's Theory material.)_
 > [!NOTE]
 > ***Your Answer***
 >
-> _(Write your answer here.)_
+> Database management system: 1. Concurrency control, 2. Backup and Recovery, 3. Security, 4. Integrity enforcement
 
 **Q4.** Explain program-data independence with a concrete example. Why is it important?
 _(See Section 5.2 of this week's Theory material.)_
@@ -259,7 +261,7 @@ _(See Section 5.2 of this week's Theory material.)_
 > [!NOTE]
 > ***Your Answer***
 >
-> _(Write your answer here.)_
+> Its important because you can for example add in a products table another column and the DBMS wont break and continues to work perfectly because the query on the website for example doesnt need the information from this new column
 
 **Q5.** What is metadata? Give two examples of metadata for a `products` table.
 _(See Section 8 of this week's Theory material.)_
@@ -267,7 +269,7 @@ _(See Section 8 of this week's Theory material.)_
 > [!NOTE]
 > ***Your Answer***
 >
-> _(Write your answer here.)_
+> Its data about the data, it tells you that price is numeric and usually greater than 0 or category id tells you, that every products belongs to a product category
 
 **Q6.** What is the three-schema architecture? Name and briefly describe each level.
 _(See Section 3.3 of this week's Theory material.)_
@@ -275,7 +277,7 @@ _(See Section 3.3 of this week's Theory material.)_
 > [!NOTE]
 > ***Your Answer***
 >
-> _(Write your answer here.)_
+> External level is the view level, people only see what the have the permission to. Marketing sees the products and prices, warehouse the stocks and id. Same database, different views. Conceptual level: the structure and how the database is organized, like tables, columns, datatypes. Internal level: thats the physical level you usually not interact with, because the DBMS is doing that for you. Its about file formats, index structures and data compression.
 
 **Q7.** Explain the difference between logical data independence and physical data independence.
 _(See Section 3.4 of this week's Theory material.)_
@@ -283,7 +285,7 @@ _(See Section 3.4 of this week's Theory material.)_
 > [!NOTE]
 > ***Your Answer***
 >
-> _(Write your answer here.)_
+> logical data independence: you can change the conceptual level without affecting the other ones. Physical data independence: You can change the internal level without changing the logical structure.
 
 **Q8.** What is a transaction? Why is atomicity important? Give a TrailShop example.
 _(See Section 5.5 of this week's Theory material.)_
@@ -291,7 +293,7 @@ _(See Section 5.5 of this week's Theory material.)_
 > [!NOTE]
 > ***Your Answer***
 >
-> _(Write your answer here.)_
+> A transaction is multiple steps grouped together, that must be executed completely or not at all. For example in case of a transaction you have to decrease the stocks and charge the customers payment method. If the charge of the payment method fails, you dont want the stocks to be decreased.
 
 ### True/False
 
@@ -306,7 +308,7 @@ For each statement, write **True** or **False** and correct any false statements
 > [!NOTE]
 > ***Your Answer***
 >
-> _(Write True/False and corrections for all five statements above.)_
+> 1. wrong: the data is structured in tables and that is the information about the structure (metadata), 2. true, otherwise it will crash, 3. true, 4. wrong: its opensource and widely used, 5. wrong: it describes how the data is structured
 
 ### Matching Exercise
 
@@ -343,16 +345,16 @@ Match each term (1–10) with its definition (A–J).
 >
 > | #   | Your Match |
 > | --- | ---------- |
-> | 1   |            |
-> | 2   |            |
-> | 3   |            |
-> | 4   |            |
-> | 5   |            |
-> | 6   |            |
-> | 7   |            |
-> | 8   |            |
-> | 9   |            |
-> | 10  |            |
+> | 1   |     F      |
+> | 2   |    H       |
+> | 3   |     B      |
+> | 4   |      A     |
+> | 5   |       C    |
+> | 6   |      G     |
+> | 7   |      D     |
+> | 8   |      E     |
+> | 9   |       I    |
+> | 10  |       J    |
 
 ---
 
@@ -378,7 +380,7 @@ Connect to PostgreSQL using psql and complete the following. Write down the comm
 > [!NOTE]
 > ***Your Answer***
 >
-> _(Document the commands you used and summarize the output for each step.)_
+> 2. \c, 3. \dt, 4. \h , 5. \q
 
 ### Exercise 3.2: Explore the System Catalog
 
@@ -402,7 +404,16 @@ Why does the last query return no rows? What would you expect to see after creat
 > [!NOTE]
 > ***Your Answer***
 >
-> _(Write your answer here.)_
+>  current_database
+------------------
+ trailshop
+(1 row)
+                                 version
+-------------------------------------------------------------------------
+ PostgreSQL 18.6 on x86_64-windows, compiled by msvc-19.44.35228, 64-bit
+(1 row)
+
+I would expect publicly available data on the external level?!
 
 ### Exercise 3.3: Create and Drop a Test Database
 
