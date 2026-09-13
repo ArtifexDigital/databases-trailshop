@@ -19,7 +19,7 @@ Using the `products`, `categories`, and `customers` tables shown in Section 2 of
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
+> Its the product_id because its unique for each product and isnt likely to change that much. The value is also never NULL.
 >
 >
 >
@@ -31,7 +31,7 @@ Using the `products`, `categories`, and `customers` tables shown in Section 2 of
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
+> Its the categorie_id because for the same reasons as the product_id.
 >
 >
 >
@@ -43,7 +43,7 @@ Using the `products`, `categories`, and `customers` tables shown in Section 2 of
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
+> Its the product_id for the same reasons as the product_id and categorie_id.
 >
 >
 >
@@ -56,7 +56,7 @@ Using the `products`, `categories`, and `customers` tables shown in Section 2 of
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
+> Its only suitable, if we assume that all products will have a unique name which is not realistic and risky. If we assume, that the names arent unique, then its not suitable for a primary key. 
 >
 >
 >
@@ -66,7 +66,7 @@ Using the `products`, `categories`, and `customers` tables shown in Section 2 of
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
+> {product_id, name} is a superkey, but not a candidate key, because its not minimal, because name is not adding any value to it.
 >
 >
 >
@@ -77,7 +77,7 @@ Using the `products`, `categories`, and `customers` tables shown in Section 2 of
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
+> (order_id, product_id) is a composite key, because order_id alone can appear for example if you buy more than one product in the same order. Product_id alone can appear for example if you order the same product more than once. So individually, they are not unique alone.
 >
 >
 >
@@ -88,7 +88,7 @@ Using the `products`, `categories`, and `customers` tables shown in Section 2 of
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
+> email can be a candidate key, but again risky. It can change easiely and can also appear twice. Thats why its not a good choice as a primary key. customer_id is better because its a surrogate key and is guaranteed to be unique and never change. 
 >
 >
 >
@@ -114,7 +114,14 @@ Think about rules for customers, orders, and categories — not just products.
 > [!NOTE]
 > ***Your Answer***
 >
-> *(List your 5 business rules with constraint types, table/column, and SQL syntax.)*
+> | Business Rule | Constraint Type | Table.Column | SQL |
+|---|---|---|---|
+| Every customer must have a unique ID | PRIMARY KEY | customer_id | `PRIMARY KEY (customer_id)` |
+| Every email must be unique | UNIQUE | customers.email | `UNIQUE (email)` |
+| Every order_item must have a unique order_id and product_id combination | PRIMARY KEY | order_items | `PRIMARY KEY (order_id, product_id)` |
+| Product price must be greater than zero | CHECK | products.price | `CHECK (price > 0)` |
+| category_id in products must exist in categories | FOREIGN KEY | products.category_id | `FOREIGN KEY (category_id) REFERENCES categories(category_id)` |
+| ... | ... | ... | ... |
 >
 >
 >
@@ -161,8 +168,14 @@ VALUES (1001, 101, 0, 189.50);
 > [!NOTE]
 > ***Your Answer***
 >
-> *(For each statement A–H, write SUCCESS or FAIL and explain any violation.)*
->
+> Statement A: FAIL, because categorie_id can't be null.
+Statement B: Succeed
+Statement C: Fail, because price is negative.
+Statement D: Succeed, unless 103 isnt used (otherwise it would fail, becuase product_id is already used and has to be unique).
+Statement E: Fail, because category_id 10 doesnt exist.
+Statement F: Fail, because name cant be NULL
+Statement G: Fail, because stock_quantity is negative.
+Statement H: Fail, because quantity is 0.
 >
 >
 >
@@ -181,8 +194,11 @@ Consider the following scenario using the schema from Theory Section 9.8:
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
->
+> On delete restrict: prevent the category from beeing deleted
+On delete cascade: Deleting the referenced rows too
+On delete set null: Set the Values to NULL
+
+I would recommend ON DELETE RESTRICT or ON DELETE SET NULL, because it deletes the categorie, but keeps the products you maybe want to add to another categorie.
 >
 >
 >
@@ -203,7 +219,17 @@ Answer each question in 2–4 sentences unless otherwise specified. Reference th
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
+> Section 2 & 3
+Relation: a table, a set of tuples
+tuples: Rows in the table (relation)
+attribute: column in a table (relation)
+Domain: Set of all allowed values for a attribute (column)
+
+Relation: /customers/
+tuples: 1 | test@xamk.fi | Test | 0401234567 | 123 Main St
+attribute: customer id, email, name, phone, address
+Domain: VARCHAR (n), INTEGER
+
 >
 >
 >
@@ -217,10 +243,14 @@ Answer each question in 2–4 sentences unless otherwise specified. Reference th
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
+> Section 6
 >
+> A candidate key has to be unique and minimal. A primary key doesnt have to be minimal, but must be unique. Every candidate key is a primary key, but not vice versa. You can have more than one candidate key, for example product id and usually name.
+> 
 >
->
+> 
+> 
+>  
 >
 
 *(See Section 6 of this week's Theory material.)*
@@ -231,7 +261,10 @@ Answer each question in 2–4 sentences unless otherwise specified. Reference th
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
+> Section 8.1 
+
+It says, that every relation must have a primary key and it cannot be NULL.
+Imagine it would be NULL, you couldnt uniquely identify the tuples (rows) without the primary key and the system would break down. You also cant find the row to update or delete it.
 >
 >
 >
@@ -244,7 +277,16 @@ Answer each question in 2–4 sentences unless otherwise specified. Reference th
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
+> Section 8.2
+
+Then you would have orphan records, for example rows that refer to something, that doesnt exist. 
+
+INSERT INTO products (product_id, name, price, stock_quantity, category_id)
+VALUES (109, 'Ghost Product', 59.99, 5, 99);
+
+ERROR:  insert or update on table "products" violates foreign key constraint
+        "products_category_id_fkey"
+DETAIL:  Key (category_id)=(99) is not present in table "categories".
 >
 >
 >
@@ -257,8 +299,7 @@ Answer each question in 2–4 sentences unless otherwise specified. Reference th
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
->
+> A surrogate key is an artificial key, that has no business meaning, for example an auto generated product id. A natural key is derived from the business domain, for example a product's ISBN number.
 >
 >
 >
@@ -271,7 +312,7 @@ Answer each question in 2–4 sentences unless otherwise specified. Reference th
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
+> A NULL value cant be identified. Its wrong, because you can only use an equal sign in combination with numbers. You should write IS NULL instead.
 >
 >
 >
@@ -284,7 +325,13 @@ Answer each question in 2–4 sentences unless otherwise specified. Reference th
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
+> A Junction table is a table where you can see the references between two tables. Its needed when you have a M:N (many-to-many) relationship between two tables. 
+
+CREATE TABLE book_authors (
+    isbn      CHAR(13) REFERENCES books(isbn),
+    author_id INTEGER  REFERENCES authors(author_id),
+    PRIMARY KEY (isbn, author_id)
+);
 >
 >
 >
@@ -297,8 +344,12 @@ Answer each question in 2–4 sentences unless otherwise specified. Reference th
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
->
+> 1:1: One row in Table A has exactly one connection to a row in Table B
+products (1) ──── (1) product_details
+1:N: One row in Table A has multiple connections to rows in Table B
+products (1) ──── (N) product_reviews
+M:N: Many rows in Table A have multiple connections to rows in Table B
+customers (M) ──── (N) orders
 >
 >
 >
@@ -311,9 +362,9 @@ Answer each question in 2–4 sentences unless otherwise specified. Reference th
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
->
->
+> ON DELETE RESTRICT prevents you from deleting a referenced value
+ON DELETE CASCADE deletes the referenced value too. On default you should use ON DELETE RESTRICT, because otherwise the system deletes related values and you lose data.
+> 
 >
 >
 
@@ -324,7 +375,14 @@ Answer each question in 2–4 sentences unless otherwise specified. Reference th
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
+> It means that every value in a cell is atomic, in other words, it contains only a single value, that cant be split again. 
+
+For Example
+
+product_id | name                    | categories  
+101        | Alpine Pro Hiking Boots | Footwear, Hiking
+
+The cell "Footwear, Hiking" is not atomic — it contains two values, separated by a comma, which can cause violation, because its not defined in the table schema.
 >
 >
 >
@@ -383,18 +441,18 @@ Match each term (1–12) with its definition (A–L).
 >
 > | # | Your Match |
 > |---|---|
-> | 1 | |
-> | 2 | |
-> | 3 | |
-> | 4 | |
-> | 5 | |
-> | 6 | |
-> | 7 | |
-> | 8 | |
-> | 9 | |
-> | 10 | |
-> | 11 | |
-> | 12 | |
+> | 1 |F|
+> | 2 |G|
+> | 3 |B|
+> | 4 |H|
+> | 5 |E|
+> | 6 |D|
+> | 7 |J|
+> | 8 |C|
+> | 9 |A|
+> | 10 |K|
+> | 11 |I|
+> | 12 |L|
 >
 
 ---
@@ -435,27 +493,33 @@ For each statement below, predict: **SUCCESS** or **FAIL**? If fail, name the vi
 ```sql
 -- 1
 INSERT INTO employees VALUES (102, 'Carol', 70000, 1);
-
+--> SUCCESS
 -- 2
 INSERT INTO employees VALUES (103, 'Dan', -5000, 1);
-
+--> FAIL, salary must be positive
 -- 3
 INSERT INTO employees VALUES (100, 'Eve', 80000, 2);
+--> FAIL, employee_id 100 already exists
 
 -- 4
 INSERT INTO employees VALUES (104, 'Frank', 60000, 5);
+--> FAIL, dept_id 5 does not exist
 
 -- 5
 INSERT INTO departments VALUES (3, 'Engineering');
+--> FAIL, dept_name 'Engineering' already exists
 
 -- 6
 INSERT INTO employees VALUES (105, NULL, 55000, 2);
+--> FAIL, name must be not null
 
 -- 7
 DELETE FROM departments WHERE dept_id = 1;
+--> FAIL, referential integrity violation
 
 -- 8
 INSERT INTO employees VALUES (106, 'Grace', 0, 2);
+--> SUCCESS
 ```
 
 ### Exercise 3.2: Write the Constraints
@@ -469,6 +533,35 @@ Given these business rules for a **bookstore database**, write the `CREATE TABLE
 5. Publication year must be between 1450 and the current year.
 
 *(Hint: you'll need at least 4 tables, including a junction table for the M:N relationship.)*
+
+> [!NOTE]
+> ***Your Answer***
+>
+> CREATE TABLE books (
+    isbn             CHAR(13)      PRIMARY KEY,
+    title            VARCHAR(255)  NOT NULL,
+    price            NUMERIC(10,2) NOT NULL CHECK (price > 0),
+    publication_year INTEGER       CHECK (publication_year >= 1450
+                                      AND publication_year <= EXTRACT(YEAR FROM CURRENT_DATE)),
+    genre_id         INTEGER       NOT NULL REFERENCES genres(genre_id)
+);
+
+>CREATE TABLE authors (
+    author_id INTEGER PRIMARY KEY,
+    first_name VARCHAR(50) NOT NULL,
+    last_name VARCHAR(50) NOT NULL
+);
+>
+>CREATE TABLE book_authors (
+    isbn      CHAR(13) REFERENCES books(isbn),
+    author_id INTEGER  REFERENCES authors(author_id),
+    PRIMARY KEY (isbn, author_id)
+);
+
+> CREATE TABLE genres (
+    genre_id   INTEGER     PRIMARY KEY,
+    genre_name VARCHAR(50) NOT NULL UNIQUE
+);
 
 ---
 
@@ -496,13 +589,38 @@ A small public library needs a database. Here is a description of their requirem
 
 > [!NOTE]
 > ***Your Answer***
->
-> *(Write your answer here.)*
->
->
->
->
+> Tables:
+> books: isbn (natural primary Key), title, publication_year, genre_id 
+> genre: genre_id (surrogate primary Key), name (candidate key)
+> copies: copy_id (surrogate primary Key), barcode (candidate key)
+> members: member_id (surrogate primary Key), name, email (candidate key), phone
+> borrowings: borrow_id (surrogate primary Key), member_id (foreign Key, references members), copy_id (foreign Key, references copies), borrow_date, due_date, return_date
+> 
 6. **Write the CREATE TABLE statements** for at least the `books`, `copies`, and `borrowings` tables with full constraints.
+
+> [!NOTE]
+> ***Your Answer***
+> CREATE TABLE books(
+    isbn CHAR(13) PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    publication_year INTEGER NOT NULL,
+    genre_id INTEGER NOT NULL REFERENCES genres(genre_id)
+);
+
+CREATE TABLE copies(
+    copy_id INTEGER PRIMARY KEY,
+    barcode INTEGER NOT NULL
+)
+
+CREATE TABLE borrowings(
+    borrow_id INTEGER PRIMARY KEY,
+    member_id INTEGER NOT NULL REFERENCES memebers(member_id),
+    copy_id INTEGER NOT NULL REFERENCES copies(copy_id),
+    borrow_date DATE NOT NULL,
+    due_date DATE NOT NULL CHECK (due_date = borrow_date + 14 days),
+    return_date DATE
+)
+> 
 
 ---
 
