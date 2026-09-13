@@ -40,11 +40,9 @@ Using the entity descriptions from Theory Section 12, create an ER diagram that 
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
+> ![ER Diagram](../ER-Diagramm_trailshop.jpg)
 >
->
->
->
+> I chose to make OrderItem a weak entity, because it depends on Order. If the Order is deleted, then the OrderItem is also deleted. Unit_price is stored in OrderItem, because the price of a product can change over time, so we need to store the price at the time of purchase.
 
 ---
 
