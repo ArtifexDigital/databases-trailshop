@@ -55,7 +55,7 @@ Answer each question in 2–4 sentences. Reference the relevant theory section.
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
+> Its mandatory for the preperation of the database, because restructuring a database in production with all the data in it is painful, risky and expensive. The conceptual data model lets you think of what data exists, how it relates and what rules govern it.
 >
 >
 >
@@ -66,9 +66,9 @@ Answer each question in 2–4 sentences. Reference the relevant theory section.
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
+> Conceptual level: This is the unified, organization-wide view of all the data and the relationships between data elements. Basically its the ER Diagram.
 >
->
+> Logical Level: This translates the conceptual model into the structures of a specific type of database system (relational, document, graph, etc.). Basically its the relational schema
 >
 >
 
@@ -77,7 +77,7 @@ Answer each question in 2–4 sentences. Reference the relevant theory section.
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
+> With logical data independence, the data and its structures can be changed without affecting the conceptual or external schema. So if we change something, the view of the user doesnt change. For example: You split the products table into products and product_details. The warehouse team's view still works because you redefine it to JOIN the two tables. 
 >
 >
 >
@@ -88,7 +88,7 @@ Answer each question in 2–4 sentences. Reference the relevant theory section.
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
+> With physical independence you can change the internal schema without affecting the conceptual orexternal schema. For example: You move the database from one disk to another, You add an index on products.name to speed up searches, You switch from B-tree to hash indexing and none of the SQL queries or views change. 
 >
 >
 >
@@ -99,7 +99,9 @@ Answer each question in 2–4 sentences. Reference the relevant theory section.
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
+> Strong Entity: An entity that has its own unique identifier (primary key) and can exist independently of other entities. Example: A Customer.
+
+Weak Entity: An entity that cannot exist independently and relies on a strong entity for its identification. It does not have its own unique identifier but rather a partial identifier that is combined with the primary key of the strong entity to form a unique identifier. Example: An OrderItem, because it depends on the Order.
 >
 >
 >
@@ -110,10 +112,10 @@ Answer each question in 2–4 sentences. Reference the relevant theory section.
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
+> A composite attribute can be divided into smaller, meaningful sub-attributes. For Exmaple: A Person can be divided into Name, Address, City, State. A multivalued attribute can hold multiple values for a single entity instance. For Example: phone numbers, product tags
 >
 >
->
+> 
 >
 
 7. What is a derived attribute? Why is it usually not stored in the database? *(Section 6)*
@@ -121,7 +123,7 @@ Answer each question in 2–4 sentences. Reference the relevant theory section.
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
+> A derived attribute is one whose value can be calculated from other attributes. It is not stored directly but computed when needed. Its not stored because it can become inconsistent with the source data.
 >
 >
 >
@@ -131,7 +133,7 @@ Answer each question in 2–4 sentences. Reference the relevant theory section.
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
+> A binary relationship involves exactly two entity types. This is the most common type. For Example: Product belongs to category. A unary relationship (also called recursive) involves a single entity type related to itself. For example: Category is_subcategory_of Category "Hiking Boots" is a subcategory of "Footwear." Both are categories.
 >
 
 
@@ -141,7 +143,7 @@ Answer each question in 2–4 sentences. Reference the relevant theory section.
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
+> In a non-identifying relationship the two entities are independent and can exist alone. In an identifying relationship the one entity (the weak one) cant exist alone and is depent from the primary key. It affects the child table's primary key by the foreign key of the parent table being part of the primary key of the child table.
 >
 
 
@@ -149,12 +151,21 @@ Answer each question in 2–4 sentences. Reference the relevant theory section.
 
 10. In crow's foot notation, what does the following endpoint mean: a circle followed by a crow's foot (fork)? *(Section 9)*
 
+> [!NOTE]
+> ***Your Answer***
+>
+> It means that the relationship is optional on that side (symbolized by the circle) and mandatory on that side (symbolized by the crow's foot). The crows foot means "many". 
+>
+>
+>
+>
+
 11. Why can't a many-to-many (M:N) relationship be directly implemented in a relational database? What is the solution? *(Section 10)*
 
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
+> Because the system wouldnt know, which primary key it should store. The Solution is a junction table. This table is inserted between the two entities and has foreign keys referencing both entities, creating two separate one-to-many relationships.
 >
 >
 >
@@ -165,7 +176,7 @@ Answer each question in 2–4 sentences. Reference the relevant theory section.
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
+> Employee (1,1) --- belongs --- (1, N) department
 >
 >
 >
@@ -212,7 +223,7 @@ a) Can an author exist without having written any books? Explain using the notat
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
+> Yes, because the relationship says 0<, which means zero or many.
 >
 >
 >
@@ -222,7 +233,7 @@ b) Can a book exist without being loaned? Explain using the notation.
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
+> Yes, because the relationship says 0<, which means zero or many. For example a new book, that hasn't been loaned out yet.
 >
 >
 >
@@ -234,7 +245,7 @@ c) What type of entity is Loan in this diagram? Is it a junction/associative ent
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
+> It is a junction entity, because it connects the book and member entities.
 >
 >
 >
@@ -246,7 +257,7 @@ d) What is the cardinality of the Author-Book relationship? Is this realistic? W
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
+> 1:N. Not realistic because one book can be written by many authors and one author can write many books. A M:N relationship would be more accurate.
 >
 >
 >
@@ -258,7 +269,7 @@ e) What attributes would you add to the Loan entity?
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
+> LoanDate, ReturnDate, MemberID, BookID, DueDate
 >
 >
 >
@@ -278,7 +289,7 @@ STUDENT ──O|──────O<── ENROLLMENT ──>|──||── COU
 
 Relationships:
 - Student `──O|──────O<──` Enrollment (a student may have zero or many enrollments)
-- Enrollment `──||──────||──` Course (each enrollment is for exactly one course)
+- Enrollment `──>|──────||──` Course (each enrollment is for exactly one course)
 - Teacher `──||──────O<──` Course (each course has zero or many sections, each taught by exactly one teacher)
 
 **Questions:**
@@ -289,7 +300,7 @@ a) Can a student exist without being enrolled in any course?
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
+> Yes, because the relationship says 0|, which means zero or one.
 >
 >
 >
@@ -301,7 +312,7 @@ b) Can a course exist without having any enrolled students?
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
+> No, because it say >|, which means one or many, but not zero.
 >
 >
 >
@@ -313,7 +324,7 @@ c) What is the cardinality between Student and Course (through Enrollment)?
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
+> M:N. You can enroll in many courses and a course can have many students.
 >
 >
 >
@@ -325,7 +336,7 @@ d) Can a teacher exist without teaching any courses?
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
+> Yes, because the relationship says 0<, which means zero or many.
 >
 >
 >
@@ -337,7 +348,7 @@ e) Is the Teacher-Course relationship 1:1 or 1:N? What does this imply about tea
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
+> It's 1:N. It implies that each course has exactly one teacher and each teacher can have many courses. Team teaching wouldn't be possible with this model.
 >
 >
 >
@@ -372,9 +383,19 @@ FitZone is a local gym and fitness center. They need a database to manage their 
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
+> Member (MemberID, FirstName, LastName, Email, Phone, DateOfBirth, MembershipStartDate)
 >
+MembershipPlan (PlanID, Name, MonthlyPrice, Description)
 >
+Trainer (TrainerID, FirstName, LastName, Specialization, HireDate)
+>
+Class (ClassID, Name, DayOfWeek, StartTime, EndTime, MaxCapacity)
+>
+Registration (RegistrationID, RegistrationDate)
+>
+Equipment (EquipmentID, Name, Type, PurchaseDate, Status)
+>
+MaintenanceRequest (RequestID, RequestDate, Description, Status, ResolutionDate)
 >
 >
 
@@ -383,7 +404,11 @@ FitZone is a local gym and fitness center. They need a database to manage their 
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
+> Member      ──>O───── subscribes_to ─────||──  MembershipPlan (1:N)
+Trainer     ──||───── leads ────────────O<──  Class (1:N)
+Member      ──||───── has ──────────────O<──  Registration (1:N)
+Registration ──>O──── is_for ───────────||──  Class (1:N)
+Equipment   ──||───── has ──────────────O<──  MaintenanceRequest 1:N
 >
 >
 >
@@ -394,18 +419,15 @@ FitZone is a local gym and fitness center. They need a database to manage their 
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Add a link to your image here)*
->
->
->
->
+> ![ER Diagram](<../ER-Diagramm Week38.jpg>)
+
 
 4. Identify any entity that might be considered a weak entity or a junction/associative entity. Justify your answer.
 
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
+> Registration is a junction entity because it connects the member and class entities, and is dependent.
 >
 >
 >
@@ -416,7 +438,7 @@ FitZone is a local gym and fitness center. They need a database to manage their 
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
+> Registration resolves the M:N relationship between member and class.
 >
 >
 >
@@ -461,10 +483,13 @@ a) State what the error is
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
+> 1. In Books, the attribute genres holds "Fiction, Mystery, Thriller" in a single field.
 >
+> 2. Books to Customer is defined as M:N with no junction table.
 >
+> 3. The entity is called Books (plural), while Customer and Purchase are singular.
 >
+> 4. There is no relationship defined between Books and Purchase, so the model cannot record which books were actually bought in a purchase.
 >
 
 b) Explain why it's a problem (reference the relevant theory section)
@@ -472,10 +497,13 @@ b) Explain why it's a problem (reference the relevant theory section)
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
->
->
->
+> 1. (Sections 6.4 and 11.3): genres is a multivalued attribute. Storing several values in one cell violates atomicity (first normal form).
+
+2. (Sections 10.1 and 11.3): A relational database has no way to implement M:N directly. A foreign key column can hold only one value, so neither side can store the key of the other — Books would need many customer_id values and Customer would need many book_id values.
+
+3. (Section 11.1): Entity names must be singular nouns, because an entity type describes a single instance ("one Book", "one Customer"). Mixing Books (plural) with Customer and Purchase (singular) is inconsistent and makes the model harder to read and to translate into table names.
+
+4. (Sections 7.1 and 11.3): A Purchase with only purchase_id, purchase_date and total_amount records that a customer spent money, but not what they bought.
 >
 
 c) Describe how to fix it
@@ -483,10 +511,11 @@ c) Describe how to fix it
 > [!NOTE]
 > ***Your Answer***
 >
-> *(Write your answer here.)*
+> 1. Remove genres from Book and create a separate entity Genre (genre_id PK, name).
 >
+> 2. + 4. Delete the direct Book–Customer relationship and add a JunctionTable PurchaseItem (purchase_id PK/FK, book_id PK/FK, quantity, unit_price) 
 >
->
+> 3. Rename Books to Book.
 >
 
 **Hints:** Think about multivalued attributes, M:N relationships, entity naming conventions, and missing relationships.
