@@ -90,7 +90,7 @@ For TrailShop, a requirements document might include:
 **Business Rules:**
 - Product prices must be positive
 - Stock quantity cannot be negative
-- Every product must have a category
+- A product may belong to many categories (and a category to many products)
 - Every order must belong to a customer
 - Category names must be unique
 - Customer emails must be unique
@@ -165,34 +165,43 @@ Notice how the composite attribute "address" was **decomposed** into individual 
 
 **Rule:** Add the primary key of the "one" side as a foreign key column in the "many" side table.
 
-**Example: Category (1) → Product (N)**
+**Example: Customer (1) → Order (N)**
 
-The Product table gets a `category_id` column that references `categories.category_id`:
+The Order table gets a `customer_id` column that references `customers.customer_id`:
 
 ```sql
-CREATE TABLE products (
-    product_id     INTEGER        PRIMARY KEY,
-    name           VARCHAR(100)   NOT NULL,
-    description    TEXT,
-    price          NUMERIC(10,2)  NOT NULL CHECK (price > 0),
-    weight_kg      NUMERIC(6,2),
-    stock_quantity INTEGER        NOT NULL DEFAULT 0
-                                  CHECK (stock_quantity >= 0),
-    created_at     TIMESTAMPTZ    NOT NULL DEFAULT NOW(),
-    category_id    INTEGER        NOT NULL
-                                  REFERENCES categories(category_id)
+CREATE TABLE orders (
+    order_id    INTEGER       PRIMARY KEY,
+    customer_id INTEGER       NOT NULL
+                              REFERENCES customers(customer_id),
+    order_date  TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+    status      VARCHAR(20)   NOT NULL DEFAULT 'pending'
 );
 ```
 
-**Why on the "many" side?** Because each product belongs to ONE category — you can store that single reference in the product row. If you tried to store it on the Category side, you'd need to store multiple product IDs per category row, violating atomicity.
+**Why on the "many" side?** Because each order belongs to ONE customer — you can store that single reference in the order row. If you tried to store it on the Customer side, you'd need to store multiple order IDs per customer row, violating atomicity.
 
 **Participation and NULLability:**
-- Mandatory participation (every product MUST have a category) → `NOT NULL` on the FK column
-- Optional participation (a product MAY have no category) → allow NULL on the FK column
+- Mandatory participation (every order MUST have a customer) → `NOT NULL` on the FK column
+- Optional participation (an order MAY have no customer) → allow NULL on the FK column
+
+Category–Product is **not** 1:N. A product can belong to many categories, so that relationship uses Rule 3 (junction table) instead of a `category_id` column on `products`.
 
 ### 3.3 Rule 3: Many-to-Many (M:N) → Junction Table
 
 **Rule:** Create a new table (junction/associative table) containing the primary keys of both participating entities as foreign keys. The primary key of the junction table is typically the composite of both foreign keys.
+
+**Example: Category (M) ↔ Product (N) resolved via ProductCategory**
+
+This is a *pure* junction — it stores only the two keys, with no extra attributes:
+
+```sql
+CREATE TABLE product_categories (
+    product_id  INTEGER NOT NULL REFERENCES products(product_id),
+    category_id INTEGER NOT NULL REFERENCES categories(category_id),
+    PRIMARY KEY (product_id, category_id)
+);
+```
 
 **Example: Order (M) ↔ Product (N) resolved via OrderItem**
 
@@ -227,7 +236,7 @@ CREATE TABLE order_items (
 - Pros: simpler references from other tables, single-column PK
 - Cons: extra column, must add UNIQUE constraint separately
 
-For TrailShop we'll use the composite key approach — it's cleaner for this use case.
+For TrailShop we'll use the composite key approach for both `product_categories` and `order_items`.
 
 ### 3.4 Rule 4: One-to-One (1:1) → Foreign Key Placement Decision
 
@@ -627,9 +636,9 @@ Links a column to the primary key (or unique column) of another table. Enforces 
 
 **Inline syntax:**
 ```sql
-CREATE TABLE products (
-    product_id  INTEGER PRIMARY KEY,
-    category_id INTEGER NOT NULL REFERENCES categories(category_id)
+CREATE TABLE orders (
+    order_id    INTEGER PRIMARY KEY,
+    customer_id INTEGER NOT NULL REFERENCES customers(customer_id)
 );
 ```
 
@@ -756,7 +765,7 @@ CREATE TABLE order_items (
 - Delete a customer → delete their orders? Maybe, maybe not. Consider soft-delete instead.
 
 **RESTRICT / NO ACTION** — Use when deletion should be blocked if children exist.
-- Delete a category → should fail if products still reference it (force the user to reassign products first)
+- Delete a customer → should fail if they have orders (order history matters)
 - Delete a product → should fail if it appears in existing order items (historical data matters)
 
 **SET NULL** — Use when the child should survive but lose its link.
@@ -793,7 +802,8 @@ Parent row is being deleted. What happens to child rows?
 
 | FK Relationship | ON DELETE | ON UPDATE | Reasoning |
 |---|---|---|---|
-| `products.category_id` → `categories` | RESTRICT | CASCADE | Don't delete a category that has products |
+| `product_categories.product_id` → `products` | CASCADE | CASCADE | Link rows are meaningless without the product |
+| `product_categories.category_id` → `categories` | CASCADE | CASCADE | Link rows are meaningless without the category; products themselves survive |
 | `orders.customer_id` → `customers` | RESTRICT | CASCADE | Don't delete a customer with orders (consider soft-delete) |
 | `order_items.order_id` → `orders` | CASCADE | CASCADE | Order items are part of the order |
 | `order_items.product_id` → `products` | RESTRICT | CASCADE | Don't delete a product that appears in order history |
@@ -847,7 +857,7 @@ Consistent naming makes your schema readable, maintainable, and less error-prone
 | Table names | Plural nouns | `products`, `customers`, `order_items` |
 | Column names | Singular descriptive | `first_name`, `order_date`, `unit_price` |
 | Primary keys | `<singular_table_name>_id` | `product_id`, `customer_id` |
-| Foreign keys | Same name as the PK they reference | `products.category_id` → `categories.category_id` |
+| Foreign keys | Same name as the PK they reference | `product_categories.category_id` → `categories.category_id` |
 | Boolean columns | Prefix with `is_`, `has_`, `can_` | `is_active`, `has_shipped` |
 | Timestamps | Suffix with `_at` or `_on` | `created_at`, `shipped_on` |
 | Constraints | `<table>_<column(s)>_<type>` | `products_price_check`, `customers_email_key` |
@@ -929,7 +939,7 @@ Full list: https://www.postgresql.org/docs/current/sql-keywords-appendix.html
 
 ## 10. Complete TrailShop Schema
 
-Here are the complete `CREATE TABLE` statements for all five TrailShop tables, incorporating every concept from this chapter.
+Here are the complete `CREATE TABLE` statements for all six TrailShop tables, incorporating every concept from this chapter.
 
 ### 10.1 Creation Order
 
@@ -937,9 +947,10 @@ Tables must be created in dependency order — you can't reference a table that 
 
 1. `categories` (no FK dependencies)
 2. `customers` (no FK dependencies)
-3. `products` (depends on `categories`)
-4. `orders` (depends on `customers`)
-5. `order_items` (depends on `orders` and `products`)
+3. `products` (no FK dependencies — categories are linked through the junction)
+4. `product_categories` (depends on `products` and `categories`)
+5. `orders` (depends on `customers`)
+6. `order_items` (depends on `orders` and `products`)
 
 ### 10.2 Categories
 
@@ -991,21 +1002,37 @@ CREATE TABLE products (
                    CONSTRAINT products_weight_positive CHECK (weight_kg > 0),
     stock_quantity INTEGER        NOT NULL DEFAULT 0
                    CONSTRAINT products_stock_non_negative CHECK (stock_quantity >= 0),
-    created_at     TIMESTAMPTZ    NOT NULL DEFAULT NOW(),
-    category_id    INTEGER        NOT NULL
-                   REFERENCES categories(category_id)
-                   ON DELETE RESTRICT
-                   ON UPDATE CASCADE
+    created_at     TIMESTAMPTZ    NOT NULL DEFAULT NOW()
 );
 ```
 
 - `price` uses `NUMERIC(10,2)` — never float for money
 - Named CHECK constraints for clear error messages
 - `weight_kg` is optional but must be positive if provided
-- `category_id` FK with `RESTRICT` on delete — can't delete a category that has products
-- `ON UPDATE CASCADE` — if a category's ID changes (rare), products update automatically
+- There is **no** `category_id` on this table — categories are assigned through `product_categories`
 
-### 10.5 Orders
+### 10.5 Product Categories
+
+```sql
+CREATE TABLE product_categories (
+    product_id  INTEGER NOT NULL
+                REFERENCES products(product_id)
+                ON DELETE CASCADE
+                ON UPDATE CASCADE,
+    category_id INTEGER NOT NULL
+                REFERENCES categories(category_id)
+                ON DELETE CASCADE
+                ON UPDATE CASCADE,
+    PRIMARY KEY (product_id, category_id)
+);
+```
+
+- Composite PK `(product_id, category_id)` — a product appears at most once in a given category
+- Both FKs `ON DELETE CASCADE` — deleting a product or a category removes only the *links*; the other entity survives
+- No extra columns — this is a pure junction (contrast with `order_items`)
+- A product may have zero categories; requiring at least one would need a trigger or application check
+
+### 10.6 Orders
 
 ```sql
 CREATE TABLE orders (
@@ -1029,7 +1056,7 @@ CREATE TABLE orders (
 - Shipping address columns are optional — the customer's address is the default
 - `order_date` defaults to NOW()
 
-### 10.6 Order Items
+### 10.7 Order Items
 
 ```sql
 CREATE TABLE order_items (
@@ -1054,7 +1081,7 @@ CREATE TABLE order_items (
 - `product_id` FK with `RESTRICT` — can't delete a product with order history
 - `unit_price` is the price snapshot at order time — not derived from `products.price`
 
-### 10.7 The Complete Schema at a Glance
+### 10.8 The Complete Schema at a Glance
 
 ```
 categories
@@ -1081,8 +1108,11 @@ products
 ├── price (NUMERIC, NOT NULL, CHECK > 0)
 ├── weight_kg (NUMERIC, nullable, CHECK > 0)
 ├── stock_quantity (INTEGER, NOT NULL, DEFAULT 0, CHECK >= 0)
-├── created_at (TIMESTAMPTZ, NOT NULL, DEFAULT NOW())
-└── category_id (FK → categories, NOT NULL, ON DELETE RESTRICT)
+└── created_at (TIMESTAMPTZ, NOT NULL, DEFAULT NOW())
+
+product_categories
+├── product_id (PK, FK → products, ON DELETE CASCADE)
+└── category_id (PK, FK → categories, ON DELETE CASCADE)
 
 orders
 ├── order_id (PK, SERIAL)
@@ -1157,6 +1187,6 @@ You now know how to map strong entities to tables, place foreign keys on the "ma
 
 You've defined constraints that enforce business rules at the database level: NOT NULL, UNIQUE, CHECK, FOREIGN KEY with appropriate actions. You've adopted naming conventions that keep the schema readable, and you understand the trade-offs between surrogate and natural keys.
 
-Most importantly, you've written the complete `CREATE TABLE` statements for TrailShop's five core tables. The database is ready to be built.
+Most importantly, you've written the complete `CREATE TABLE` statements for TrailShop's six core tables. The database is ready to be built.
 
 **Next week:** You'll populate these tables with data and start writing SQL queries to retrieve, filter, sort, and aggregate information — bringing TrailShop's database to life.
