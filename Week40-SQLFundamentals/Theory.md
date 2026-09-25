@@ -311,10 +311,10 @@ Creates a link between two tables. The foreign key column must contain a value t
 
 ```sql
 -- Column-level
-category_id INTEGER REFERENCES categories(category_id)
+customer_id INTEGER REFERENCES customers(customer_id)
 
 -- Table-level (with ON DELETE/UPDATE actions)
-FOREIGN KEY (category_id) REFERENCES categories(category_id)
+FOREIGN KEY (customer_id) REFERENCES customers(customer_id)
     ON DELETE RESTRICT
     ON UPDATE CASCADE
 ```
@@ -473,13 +473,14 @@ In this course, we'll use `SERIAL` in most examples because:
 
 ## 8. Building the TrailShop Tables
 
-Now let's put everything together and build the TrailShop database. Remember the five tables from your Week 39 logical design:
+Now let's put everything together and build the TrailShop database. Remember the six tables from your Week 39 logical design:
 
 1. **categories** — product categories
 2. **products** — the items TrailShop sells
-3. **customers** — people who buy from TrailShop
-4. **orders** — purchase transactions
-5. **order_items** — individual items within each order (junction table)
+3. **product_categories** — which products belong to which categories (junction table)
+4. **customers** — people who buy from TrailShop
+5. **orders** — purchase transactions
+6. **order_items** — individual items within each order (junction table with quantity and unit_price)
 
 ### 8.1 Why Order Matters
 
@@ -487,15 +488,22 @@ You must create tables in **dependency order** — a table that references anoth
 
 The dependency chain for TrailShop:
 ```
-categories  →  products  →  order_items  ←  orders  ←  customers
+categories  ──┐
+               ├──  product_categories
+products    ──┘
+products    ──┐
+               ├──  order_items
+orders      ──┘
+customers   ──►  orders
 ```
 
 So the creation order is:
 1. `categories` (no dependencies)
 2. `customers` (no dependencies)
-3. `products` (depends on categories)
-4. `orders` (depends on customers)
-5. `order_items` (depends on both orders and products)
+3. `products` (no dependencies)
+4. `product_categories` (depends on products and categories)
+5. `orders` (depends on customers)
+6. `order_items` (depends on both orders and products)
 
 ### 8.2 Creating the Categories Table
 
@@ -535,7 +543,6 @@ CREATE TABLE products (
     description  TEXT,
     price        NUMERIC(10,2) NOT NULL CHECK (price > 0),
     stock        INTEGER NOT NULL DEFAULT 0 CHECK (stock >= 0),
-    category_id  INTEGER NOT NULL REFERENCES categories(category_id),
     created_at   TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 ```
@@ -543,10 +550,28 @@ CREATE TABLE products (
 Key decisions:
 - `price` has a CHECK constraint ensuring it's always positive — you can't have a product with a negative price
 - `stock` defaults to 0 and cannot go negative
-- `category_id` is a FOREIGN KEY referencing `categories` — every product must belong to a valid category
-- The FK is NOT NULL, meaning every product *must* have a category
+- There is **no** `category_id` here. Products are linked to categories through the `product_categories` junction table, so one product can belong to several categories.
 
-### 8.5 Creating the Orders Table
+### 8.5 Creating the Product Categories Table (Junction Table)
+
+```sql
+CREATE TABLE product_categories (
+    product_id  INTEGER NOT NULL
+                REFERENCES products(product_id)
+                ON DELETE CASCADE,
+    category_id INTEGER NOT NULL
+                REFERENCES categories(category_id)
+                ON DELETE CASCADE,
+    PRIMARY KEY (product_id, category_id)
+);
+```
+
+Key decisions:
+- Composite primary key prevents the same product–category pair twice
+- `ON DELETE CASCADE` on both FKs: deleting a product or a category removes only the *links*
+- A product may belong to zero, one, or many categories
+
+### 8.6 Creating the Orders Table
 
 ```sql
 CREATE TABLE orders (
@@ -563,7 +588,7 @@ Key decisions:
 - `status` uses a CHECK constraint to limit values to a predefined set — this is like an enum
 - `order_date` defaults to the current timestamp
 
-### 8.6 Creating the Order Items Table (Junction Table)
+### 8.7 Creating the Order Items Table (Junction Table)
 
 ```sql
 CREATE TABLE order_items (
@@ -580,7 +605,7 @@ Key decisions:
 - `unit_price` stores the price *at the time of purchase* — if the product's price changes later, the order record stays accurate
 - `quantity` must be at least 1
 
-### 8.7 The Complete Script
+### 8.8 The Complete Script
 
 Here's everything together in a single script you can run:
 
@@ -608,8 +633,15 @@ CREATE TABLE products (
     description  TEXT,
     price        NUMERIC(10,2) NOT NULL CHECK (price > 0),
     stock        INTEGER NOT NULL DEFAULT 0 CHECK (stock >= 0),
-    category_id  INTEGER NOT NULL REFERENCES categories(category_id),
     created_at   TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE product_categories (
+    product_id  INTEGER NOT NULL
+                REFERENCES products(product_id) ON DELETE CASCADE,
+    category_id INTEGER NOT NULL
+                REFERENCES categories(category_id) ON DELETE CASCADE,
+    PRIMARY KEY (product_id, category_id)
 );
 
 CREATE TABLE orders (
@@ -695,8 +727,8 @@ This is incredibly useful — you get the auto-generated ID back immediately wit
 If you want a column to use its default explicitly:
 
 ```sql
-INSERT INTO products (name, price, stock, category_id)
-VALUES ('TrailMaster X4', 149.99, DEFAULT, 1);
+INSERT INTO products (name, price, stock)
+VALUES ('TrailMaster X4', 149.99, DEFAULT);
 ```
 
 Here, `stock` will receive the DEFAULT value of `0`.
@@ -741,17 +773,25 @@ INSERT INTO customers (first_name, last_name, email) VALUES
     ('Laura', 'Hämäläinen', 'laura.h@email.com');
 
 -- Products
-INSERT INTO products (name, description, price, stock, category_id) VALUES
-    ('TrailMaster X4', 'Professional hiking boot with Gore-Tex lining', 149.99, 25, 1),
-    ('LiteStep Pro', 'Lightweight trail runner for day hikes', 89.99, 40, 1),
-    ('Summit 45L', 'Multi-day hiking backpack with rain cover', 199.99, 15, 2),
-    ('DayTripper 20L', 'Compact day pack with hydration sleeve', 59.99, 50, 2),
-    ('CloudNest 2P', 'Two-person ultralight tent', 349.99, 10, 3),
-    ('StormShield 4P', 'Four-season family tent', 499.99, 5, 3),
-    ('ThermoLayer Jacket', 'Insulated mid-layer for cold weather', 129.99, 30, 4),
-    ('RainGuard Pro', 'Waterproof breathable rain jacket', 179.99, 20, 4),
-    ('HydroFlask 1L', 'Insulated stainless steel water bottle', 34.99, 100, 5),
-    ('LumaBeam 800', 'Rechargeable headlamp, 800 lumens', 44.99, 60, 5);
+INSERT INTO products (name, description, price, stock) VALUES
+    ('TrailMaster X4', 'Professional hiking boot with Gore-Tex lining', 149.99, 25),
+    ('LiteStep Pro', 'Lightweight trail runner for day hikes', 89.99, 40),
+    ('Summit 45L', 'Multi-day hiking backpack with rain cover', 199.99, 15),
+    ('DayTripper 20L', 'Compact day pack with hydration sleeve', 59.99, 50),
+    ('CloudNest 2P', 'Two-person ultralight tent', 349.99, 10),
+    ('StormShield 4P', 'Four-season family tent', 499.99, 5),
+    ('ThermoLayer Jacket', 'Insulated mid-layer for cold weather', 129.99, 30),
+    ('RainGuard Pro', 'Waterproof breathable rain jacket', 179.99, 20),
+    ('HydroFlask 1L', 'Insulated stainless steel water bottle', 34.99, 100),
+    ('LumaBeam 800', 'Rechargeable headlamp, 800 lumens', 44.99, 60);
+
+-- Product–category assignments (RainGuard Pro is Clothing AND Accessories)
+INSERT INTO product_categories (product_id, category_id) VALUES
+    (1, 1), (2, 1),
+    (3, 2), (4, 2),
+    (5, 3), (6, 3),
+    (7, 4), (8, 4), (8, 5),
+    (9, 5), (10, 5);
 
 -- Orders
 INSERT INTO orders (customer_id, status) VALUES
@@ -832,7 +872,12 @@ You can use a subquery to determine the new value:
 
 ```sql
 UPDATE products
-SET price = (SELECT AVG(price) FROM products WHERE category_id = 1)
+SET price = (
+    SELECT AVG(p2.price)
+    FROM products p2
+    JOIN product_categories pc ON pc.product_id = p2.product_id
+    WHERE pc.category_id = 1
+)
 WHERE product_id = 2;
 ```
 
@@ -915,9 +960,11 @@ Without CASCADE, attempting to delete a row that's referenced by another table w
 
 ```sql
 -- ERROR: violates foreign key constraint
--- (because products.category_id references categories)
-DELETE FROM categories WHERE category_id = 1;
+-- (because order_items.product_id references products)
+DELETE FROM products WHERE product_id = 1;
 ```
+
+Deleting a category is different: `product_categories.category_id` uses `ON DELETE CASCADE`, so the *links* disappear but the products remain.
 
 ### 11.6 TRUNCATE vs DELETE
 
@@ -961,7 +1008,10 @@ SELECT name, price FROM products;
 ### 12.3 Filter Rows
 
 ```sql
-SELECT name, price FROM products WHERE category_id = 1;
+SELECT p.name, p.price
+FROM products p
+JOIN product_categories pc ON pc.product_id = p.product_id
+WHERE pc.category_id = 1;
 ```
 
 ### 12.4 Count Rows
