@@ -38,7 +38,17 @@ Write and execute the CREATE TABLE statements for all six TrailShop tables in th
 > **_Your SQL_**
 >
 > ```sql
-> -- Write your query here
+> trailshop=# \dt
+                 List of tables
+ Schema |        Name        | Type  |  Owner
+--------+--------------------+-------+----------
+ public | categories         | table | postgres
+ public | customers          | table | postgres
+ public | order_items        | table | postgres
+ public | orders             | table | postgres
+ public | product_categories | table | postgres
+ public | products           | table | postgres
+(6 rows)
 >
 >
 > ```
@@ -55,7 +65,15 @@ Insert the following data:
 > **_Your SQL_**
 >
 > ```sql
-> -- Write your query here
+> trailshop=# SELECT * FROM categories;
+ category_id | category_name |          description
+-------------+---------------+-------------------------------
+           2 | Backpacks     | Daypacks and expedition packs
+           1 | Footwear      | Hiking Boots for trails
+           6 | Clothing      | Clothing for trails
+           7 | Accessories   | Accessories for hiking
+           3 | Tents         | Tents for outdoor camping
+(5 rows)
 >
 >
 > ```
@@ -68,7 +86,13 @@ Insert the following data:
 > **_Your SQL_**
 >
 > ```sql
-> -- Write your query here
+> INSERT INTO customers (customer_id, first_name, last_name, email, phone, street, city, postal_code, country, registered_at) VALUES
+(1, 'Anna',   'Müller',     'anna.mueller@example.com',     '+49 151 2345678',  'Hauptstraße 12',    'Heilbronn', '74072', 'Germany', '2025-03-14 09:23:00'),
+(2, 'Jonas',  'Schmidt',    'jonas.schmidt@example.com',    '+49 160 9876543',  'Bahnhofstraße 5',   'Aalen',     '73430', 'Germany', '2025-06-02 14:45:00'),
+(3, 'Laura',  'Virtanen',   'laura.virtanen@example.com',   '+358 40 1234567',  'Porrassalmenkatu 8','Mikkeli',   '50100', 'Finland', '2025-09-21 11:10:00'),
+(4, 'Lukas',  'Weber',      'lukas.weber@example.com',      '+43 664 5551234',  'Mariahilfer Str. 45','Wien',     '1060',  'Austria', '2026-01-08 16:30:00'),
+(5, 'Sophie', 'Dubois',     'sophie.dubois@example.com',    '+33 6 12345678',   'Rue de Rivoli 22',  'Paris',     '75004', 'France',  '2026-04-17 08:05:00');
+
 >
 >
 > ```
@@ -84,7 +108,17 @@ Insert the following data:
 > **_Your SQL_**
 >
 > ```sql
-> -- Write your query here
+> INSERT INTO products (name, description, price, weight_kg, stock_quantity) VALUES
+('Trail Runner Pro Running Shoe', 'Lightweight trail running shoe with aggressive grip outsole', 149.90, 0.62, 42),
+('Alpine GTX Hiking Boot', 'Waterproof leather hiking boot with Gore-Tex membrane', 229.00, 1.45, 8),
+('Daypack 22L Backpack', 'Compact daypack with ventilated back panel and rain cover', 79.90, 0.75, 65),
+('Expedition 65+10 Trekking Backpack', 'Large trekking backpack with adjustable back length for multi-day tours', 289.00, 2.30, 3),
+('Merino Base Layer Shirt', 'Odour-resistant merino wool shirt for all seasons', 59.90, 0.18, 120),
+('Stormshell 3-Layer Rain Jacket', 'Fully taped 3-layer hardshell jacket with helmet-compatible hood', 349.00, 0.48, 0),
+('Ultralight 2P Trekking Tent', 'Freestanding two-person tent with two vestibules', 499.00, 1.35, 5),
+('Down Sleeping Bag -5 °C', '700 fill power down sleeping bag, comfort rating -5 °C', 279.00, 0.98, 14),
+('Carbon Trekking Poles (Pair)', 'Foldable carbon poles with cork grips', 119.00, 0.42, 27),
+('Hydration Bladder 2L', 'BPA-free hydration reservoir with insulated drinking tube', 24.90, 0.20, 210);
 >
 >
 > ```
@@ -97,7 +131,19 @@ Insert the following data:
 > **_Your SQL_**
 >
 > ```sql
-> -- Write your query here
+> INSERT INTO product_categories (product_id, category_id) VALUES
+(1, 1),
+(2, 1),
+(3, 2),
+(3, 7),
+(4, 2),
+(5, 6),
+(6, 6),
+(7, 3),
+(8, 3),
+(9, 7),
+(10, 2),
+(10, 7);
 >
 >
 > ```
@@ -110,7 +156,12 @@ Insert the following data:
 > **_Your SQL_**
 >
 > ```sql
-> -- Write your query here
+> INSERT INTO orders (customer_id, status, shipping_street, shipping_city, shipping_postal_code, shipping_country) VALUES
+(3, 'Delivered',  'Porrassalmenkatu 8',  'Mikkeli',   '50100', 'Finland'),
+(1, 'Shipped',    'Kaiserstraße 30',     'Stuttgart', '70173', 'Germany'),
+(5, 'Processing', 'Rue de Rivoli 22',    'Paris',     '75004', 'France'),
+(2, 'Cancelled',  'Bahnhofstraße 5',     'Aalen',     '73430', 'Germany'),
+(4, 'Pending',    'Mariahilfer Str. 45', 'Wien',      '1060',  'Austria');
 >
 >
 > ```
@@ -123,7 +174,17 @@ Insert the following data:
 > **_Your SQL_**
 >
 > ```sql
-> -- Write your query here
+> INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES
+(2, 1,  1, 149.90),  
+(2, 10, 1, 24.90),   
+(2, 5,  1, 59.90),   
+(3, 7,  1, 499.00),  
+(3, 8,  1, 279.00), 
+(3, 4,  1, 289.00),  
+(4, 5,  2, 59.90),   
+(4, 9,  1, 119.00),  
+(5, 6,  1, 349.00),  
+(6, 3,  1, 79.90);   
 >
 >
 > ```
@@ -147,7 +208,27 @@ Perform the following updates and verify each one:
 > **_Your SQL_**
 >
 > ```sql
-> -- Write your queries here
+> 1. UPDATE products
+SET price = price * 1.10
+FROM product_categories
+WHERE products.product_id = product_categories.product_id
+  AND product_categories.category_id = 1;
+
+2. UPDATE customers
+SET email = 'laura.virtanen1@example.com'
+WHERE customer_id = 3;
+
+3. UPDATE order
+SET status = 'Delivered'
+WHERE order_id = 2;
+
+4. UPDATE products
+SET stock_quantity = 85
+WHERE name = 'HydroFlask 1L';
+
+5. UPDATE products
+SET description = 'Waterproof leather hiking boot with Gore-Tex membrane'
+WHERE product_id = 2;
 >
 >
 > ```
@@ -170,7 +251,17 @@ Perform the following updates and verify each one:
 > **_Your SQL_**
 >
 > ```sql
-> -- Write your queries here
+> 1. ALTER TABLE customers
+ADD COLUMN phone VARCHAR(20);
+
+2. ALTER TABLE products
+ADD COLUMN weight_grams INTEGER;
+
+3. ALTER TABLE products
+ADD CONSTRAINT check_weight_positive CHECK (weight_grams > 0);
+
+4. ALTER TABLE products
+RENAME COLUMN stock TO quantity_in_stock;
 >
 >
 > ```
@@ -186,70 +277,70 @@ Answer the following questions in your own words using the answer fields below:
 > [!NOTE]
 > **_Your Answer_**
 >
-> _(Write your answer here.)_
+> It stands for Structured Query Language it was designed to look like englisch to keep it simple so also non programmers can use it.
 
 2. Explain the difference between DDL and DML. Give two example commands for each.
 
 > [!NOTE]
 > **_Your Answer_**
 >
-> _(Write your answer here.)_
+> DDL stands for Data Definition Language. It is used to define the structure of the database. For example: CREATE TABLE, ALTER TABLE, DROP TABLE etc. DML stands for Data Manipulation Language. It is used to work with the data inside the tables. For example: INSERT INTO, UPDATE, DELETE, SELECT etc.
 
 3. What is the difference between DCL and TCL? When would you use each?
 
 > [!NOTE]
 > **_Your Answer_**
 >
-> _(Write your answer here.)_
+> TCL stands for Transaction Control Language. It manages transactions: Groups of operations that must succeed or fail as a unit. With TCL you have something like a version control. When something went wrong between BEGIN and COMMIT you can still use ROLLBACK to undo everything. DCL is all  about permissions: Who can do what. You can use it to manage the access rights of users.
 
 4. Why must you create tables in a specific order? What determines that order?
 
 > [!NOTE]
 > **_Your Answer_**
 >
-> _(Write your answer here.)_
+> You must create tables in a specific order because of foreign keys. You have to create the table that is being referenced first and then the table that is referencing it. So you always have to start with the tables that don't have any foreign keys.
 
 5. What is the difference between a column-level constraint and a table-level constraint? When _must_ you use a table-level constraint?
 
 > [!NOTE]
 > **_Your Answer_**
 >
-> _(Write your answer here.)_
+> A column level constraint is defined on a single column. A table level constraint is defined on multiple columns. You must use a table level constraint when a constraint applies to multiple columns. For example: CHECK constraints referencing multiple columns.
 
 6. Explain the difference between `DELETE FROM products;` and `TRUNCATE TABLE products;`. When would you prefer each?
 
 > [!NOTE]
 > **_Your Answer_**
 >
-> _(Write your answer here.)_
+> DELETE is more precise, you have to add the WHERE add on. TRUNCATE just deletes every row. TRUNCATE is faster than DELETE. So you should use TRUNCATE when you want to delete all rows and DELETE when you want to delete specific rows.
 
 7. What does `ON DELETE CASCADE` do on a foreign key? Give a real-world scenario where it's appropriate and one where it would be dangerous.
 
 > [!NOTE]
 > **_Your Answer_**
 >
-> _(Write your answer here.)_
+> ON DELETE CASCADE means that if a row is deleted from the parent table, the corresponding rows in the child table are also deleted. For example, if you delete a customer, all of their orders will be deleted, thats dangerous because online shops are forced to store order history for a certain amount of time. An example where its less dangerous is when you have a table of product reviews and you delete a product, then all of its reviews will be deleted.
 
 8. Why should you store `unit_price` in the `order_items` table instead of just looking it up from the `products` table?
 
 > [!NOTE]
 > **_Your Answer_**
 >
-> _(Write your answer here.)_
+> You should store unit_price in the order_items table instead of just looking it up from the products table because the price of a product can change over time. If you store the unit_price in the order_items table, you can ensure that the price of a product is always the same for a given order.
 
 9. What is the difference between SERIAL and GENERATED ALWAYS AS IDENTITY? Which would you use in a new project and why?
 
 > [!NOTE]
 > **_Your Answer_**
 >
-> _(Write your answer here.)_
+> SERIAL is shorthand for creating columns with INTEGER NOT NULL, a sequence, and a trigger to auto-increment. GENERATED ALWAYS AS IDENTITY is the modern SQL standard way to create auto-incrementing columns. It's safer because it prevents accidental manual inserts and is clearer about intent. For a new project, I would use GENERATED ALWAYS AS IDENTITY because it's the standard and safer. GENERATED ALWAYS... can also be used in various SQL Languages like PostgreSQL, MySQL, Oracle etc.  
 
 10. Explain why `UPDATE products SET price = 9.99;` is dangerous. What steps should you take before running any UPDATE statement?
 
 > [!NOTE]
 > **_Your Answer_**
 >
-> _(Write your answer here.)_
+> Its dangerous because when you running a UPDATE statement without a WHERE clause it will update every row in the table. So you should always use a WHERE clause when running a UPDATE statement or using the TCL language so you can always roll back. 
 
 ---
 
