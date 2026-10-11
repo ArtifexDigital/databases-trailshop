@@ -97,18 +97,19 @@ DISTINCT eliminates duplicate rows from the result:
 SELECT DISTINCT status FROM orders;
 
 -- What categories have products?
-SELECT DISTINCT category_id FROM products;
+SELECT DISTINCT category_id FROM product_categories;
 ```
 
 DISTINCT applies to the *entire row* — all selected columns must match for two rows to be considered duplicates:
 
 ```sql
 -- Unique combinations of category and price range
-SELECT DISTINCT category_id, 
-       CASE WHEN price < 50 THEN 'budget'
-            WHEN price < 200 THEN 'mid'
+SELECT DISTINCT pc.category_id, 
+       CASE WHEN p.price < 50 THEN 'budget'
+            WHEN p.price < 200 THEN 'mid'
             ELSE 'premium' END AS price_tier
-FROM products;
+FROM products p
+JOIN product_categories pc ON pc.product_id = p.product_id;
 ```
 
 ### 1.6 Expressions and Calculations
@@ -174,7 +175,9 @@ WHERE status = 'pending' OR status = 'shipped';
 **NOT** — inverts a condition:
 ```sql
 SELECT name FROM products
-WHERE NOT category_id = 1;
+WHERE product_id NOT IN (
+    SELECT product_id FROM product_categories WHERE category_id = 1
+);
 ```
 
 ### 2.3 Operator Precedence
@@ -303,9 +306,10 @@ SELECT name, price FROM products ORDER BY price DESC;
 
 ```sql
 -- Sort by category, then by price within each category
-SELECT name, category_id, price
-FROM products
-ORDER BY category_id ASC, price DESC;
+SELECT p.name, pc.category_id, p.price
+FROM products p
+JOIN product_categories pc ON pc.product_id = p.product_id
+ORDER BY pc.category_id ASC, p.price DESC;
 ```
 
 ### 3.3 NULLS FIRST / NULLS LAST
@@ -409,7 +413,7 @@ SELECT COUNT(*) FROM products;
 SELECT COUNT(description) FROM products;
 
 -- Number of distinct categories that have products
-SELECT COUNT(DISTINCT category_id) FROM products;
+SELECT COUNT(DISTINCT category_id) FROM product_categories;
 ```
 
 **Key distinctions:**
@@ -490,7 +494,7 @@ GROUP BY divides rows into groups based on column values, then applies aggregate
 ```sql
 -- Count products per category
 SELECT category_id, COUNT(*) AS product_count
-FROM products
+FROM product_categories
 GROUP BY category_id;
 ```
 
@@ -500,10 +504,13 @@ GROUP BY category_id;
 
 ```sql
 -- VALID: category_id is in GROUP BY, COUNT is an aggregate
-SELECT category_id, COUNT(*) FROM products GROUP BY category_id;
+SELECT category_id, COUNT(*) FROM product_categories GROUP BY category_id;
 
 -- INVALID: name is not in GROUP BY and not aggregated
-SELECT category_id, name, COUNT(*) FROM products GROUP BY category_id;
+SELECT pc.category_id, p.name, COUNT(*)
+FROM product_categories pc
+JOIN products p ON p.product_id = pc.product_id
+GROUP BY pc.category_id;
 -- ERROR: column "products.name" must appear in GROUP BY clause
 ```
 
@@ -513,13 +520,14 @@ Why? If you're grouping by category, there are multiple product names per catego
 
 ```sql
 -- Average price per category per price range
-SELECT category_id,
-       CASE WHEN price < 100 THEN 'budget' ELSE 'premium' END AS tier,
-       ROUND(AVG(price), 2) AS avg_price,
+SELECT pc.category_id,
+       CASE WHEN p.price < 100 THEN 'budget' ELSE 'premium' END AS tier,
+       ROUND(AVG(p.price), 2) AS avg_price,
        COUNT(*) AS count
-FROM products
-GROUP BY category_id, 
-         CASE WHEN price < 100 THEN 'budget' ELSE 'premium' END;
+FROM products p
+JOIN product_categories pc ON pc.product_id = p.product_id
+GROUP BY pc.category_id, 
+         CASE WHEN p.price < 100 THEN 'budget' ELSE 'premium' END;
 ```
 
 ### 6.4 GROUP BY with ORDER BY
@@ -527,7 +535,7 @@ GROUP BY category_id,
 ```sql
 -- Categories ordered by product count (most first)
 SELECT category_id, COUNT(*) AS product_count
-FROM products
+FROM product_categories
 GROUP BY category_id
 ORDER BY product_count DESC;
 ```
@@ -543,7 +551,7 @@ HAVING filters *groups* (after GROUP BY), just as WHERE filters *rows* (before G
 ```sql
 -- Categories with more than 2 products
 SELECT category_id, COUNT(*) AS product_count
-FROM products
+FROM product_categories
 GROUP BY category_id
 HAVING COUNT(*) > 2;
 ```
@@ -560,11 +568,12 @@ HAVING COUNT(*) > 2;
 ```sql
 -- WHERE filters rows BEFORE grouping,
 -- HAVING filters groups AFTER grouping
-SELECT category_id, AVG(price) AS avg_price
-FROM products
-WHERE stock > 0            -- only consider in-stock products
-GROUP BY category_id
-HAVING AVG(price) > 100;   -- only show categories where avg > 100
+SELECT pc.category_id, AVG(p.price) AS avg_price
+FROM products p
+JOIN product_categories pc ON pc.product_id = p.product_id
+WHERE p.stock > 0            -- only consider in-stock products
+GROUP BY pc.category_id
+HAVING AVG(p.price) > 100;   -- only show categories where avg > 100
 ```
 
 Think of it this way:
@@ -576,11 +585,12 @@ Think of it this way:
 
 ```sql
 -- Categories where total inventory value exceeds €1000
-SELECT category_id,
-       SUM(price * stock) AS inventory_value
-FROM products
-GROUP BY category_id
-HAVING SUM(price * stock) > 1000;
+SELECT pc.category_id,
+       SUM(p.price * p.stock) AS inventory_value
+FROM products p
+JOIN product_categories pc ON pc.product_id = p.product_id
+GROUP BY pc.category_id
+HAVING SUM(p.price * p.stock) > 1000;
 ```
 
 ---
@@ -593,7 +603,7 @@ Joins are arguably the most powerful feature of SQL. They let you combine data f
 
 ### 8.1 Why JOINs Exist
 
-In a properly normalized database, information is spread across multiple tables to avoid redundancy. The `products` table has a `category_id` but not the category name. The `orders` table has a `customer_id` but not the customer's name. To get a complete picture, you need to *join* tables together.
+In a properly normalized database, information is spread across multiple tables to avoid redundancy. The `products` table does not store category names — those live in `categories`, linked through `product_categories`. The `orders` table has a `customer_id` but not the customer's name. To get a complete picture, you need to *join* tables together.
 
 ### 8.2 INNER JOIN
 
@@ -612,10 +622,11 @@ SELECT p.name AS product_name,
        p.price,
        c.name AS category_name
 FROM products p
-INNER JOIN categories c ON p.category_id = c.category_id;
+INNER JOIN product_categories pc ON pc.product_id = p.product_id
+INNER JOIN categories c ON c.category_id = pc.category_id;
 ```
 
-What happens: For each product row, PostgreSQL finds the matching category row (where category_ids match) and combines them into one result row. Products with no matching category (impossible here due to NOT NULL + FK) would be excluded.
+What happens: For each product row, PostgreSQL finds matching `product_categories` rows and then the category names. A product in two categories appears twice. Products with no category yet are excluded by INNER JOIN.
 
 ### 8.3 LEFT (OUTER) JOIN
 
@@ -648,7 +659,8 @@ Returns all rows from the right table, plus matching rows from the left table. I
 ```sql
 SELECT p.name, c.name AS category_name
 FROM products p
-RIGHT JOIN categories c ON p.category_id = c.category_id;
+RIGHT JOIN product_categories pc ON pc.product_id = p.product_id
+RIGHT JOIN categories c ON c.category_id = pc.category_id;
 ```
 
 In practice, RIGHT JOIN is rarely used because you can always rewrite it as a LEFT JOIN by swapping the table order. Most developers prefer LEFT JOIN for consistency.
@@ -660,7 +672,8 @@ Returns all rows from both tables. Where no match exists, NULLs fill in.
 ```sql
 SELECT c.name AS category_name, p.name AS product_name
 FROM categories c
-FULL OUTER JOIN products p ON c.category_id = p.category_id;
+FULL OUTER JOIN product_categories pc ON pc.category_id = c.category_id
+FULL OUTER JOIN products p ON p.product_id = pc.product_id;
 ```
 
 Use case: reconciliation — finding items that exist in one table but not the other (from either direction).
@@ -682,8 +695,8 @@ CROSS JOIN is rarely needed, but useful for generating combinations (e.g., all p
 NATURAL JOIN automatically joins on columns with the same name in both tables:
 
 ```sql
--- Joins on category_id because both tables have it
-SELECT * FROM products NATURAL JOIN categories;
+-- Joins on category_id because both product_categories and categories have it
+SELECT * FROM product_categories NATURAL JOIN categories;
 ```
 
 **Why to avoid it:** It's implicit and fragile. If you add a column with the same name to both tables later (e.g., `name` or `created_at`), the join condition silently changes. Always use explicit JOIN ON conditions.
@@ -710,12 +723,14 @@ When joining tables, aliases make queries much more readable:
 -- Without aliases (verbose and hard to read)
 SELECT products.name, categories.name
 FROM products
-INNER JOIN categories ON products.category_id = categories.category_id;
+INNER JOIN product_categories ON product_categories.product_id = products.product_id
+INNER JOIN categories ON categories.category_id = product_categories.category_id;
 
 -- With aliases (clean and readable)
 SELECT p.name, c.name AS category
 FROM products p
-INNER JOIN categories c ON p.category_id = c.category_id;
+INNER JOIN product_categories pc ON pc.product_id = p.product_id
+INNER JOIN categories c ON c.category_id = pc.category_id;
 ```
 
 Aliases are *required* when you join a table to itself (self-join) or use the same table multiple times.
@@ -768,7 +783,8 @@ FROM order_items oi
 INNER JOIN orders o ON oi.order_id = o.order_id
 INNER JOIN customers c ON o.customer_id = c.customer_id
 INNER JOIN products p ON oi.product_id = p.product_id
-INNER JOIN categories cat ON p.category_id = cat.category_id
+INNER JOIN product_categories pc ON pc.product_id = p.product_id
+INNER JOIN categories cat ON cat.category_id = pc.category_id
 ORDER BY customer, category;
 ```
 
@@ -817,14 +833,16 @@ ORDER BY price_with_vat DESC;
 **You can't use aggregates in WHERE:**
 ```sql
 -- WRONG: WHERE runs before GROUP BY, so aggregates don't exist yet
-SELECT category_id, AVG(price) FROM products
-WHERE AVG(price) > 100
-GROUP BY category_id;
+SELECT pc.category_id, AVG(p.price) FROM products p
+JOIN product_categories pc ON pc.product_id = p.product_id
+WHERE AVG(p.price) > 100
+GROUP BY pc.category_id;
 
 -- CORRECT: use HAVING for aggregate conditions
-SELECT category_id, AVG(price) FROM products
-GROUP BY category_id
-HAVING AVG(price) > 100;
+SELECT pc.category_id, AVG(p.price) FROM products p
+JOIN product_categories pc ON pc.product_id = p.product_id
+GROUP BY pc.category_id
+HAVING AVG(p.price) > 100;
 ```
 
 ---
@@ -879,7 +897,8 @@ WHERE name ILIKE '%pro%';
 ```sql
 SELECT c.name AS category, COUNT(*) AS product_count
 FROM products p
-INNER JOIN categories c ON p.category_id = c.category_id
+INNER JOIN product_categories pc ON pc.product_id = p.product_id
+INNER JOIN categories c ON c.category_id = pc.category_id
 GROUP BY c.name
 ORDER BY product_count DESC;
 ```
@@ -894,7 +913,8 @@ ORDER BY product_count DESC;
 SELECT c.name AS category,
        ROUND(AVG(p.price), 2) AS avg_price
 FROM products p
-INNER JOIN categories c ON p.category_id = c.category_id
+INNER JOIN product_categories pc ON pc.product_id = p.product_id
+INNER JOIN categories c ON c.category_id = pc.category_id
 GROUP BY c.name
 ORDER BY avg_price DESC;
 ```
