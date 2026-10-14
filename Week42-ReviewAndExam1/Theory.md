@@ -204,7 +204,7 @@ Here are the mistakes that appear most frequently on exams and in homework submi
 
 Every non-aggregated column in SELECT must appear in GROUP BY.
 
-**Wrong:** `SELECT name, category_id, COUNT(*) FROM products GROUP BY category_id`
+**Wrong:** `SELECT p.name, pc.category_id, COUNT(*) FROM products p JOIN product_categories pc ON pc.product_id = p.product_id GROUP BY pc.category_id`
 **Right:** Either add `name` to GROUP BY or remove it from SELECT.
 
 ### 4.3 NULL Comparison with =
@@ -217,7 +217,8 @@ NULL is not a value — it's the absence of a value. It can't be compared with e
 ### 4.4 Missing ON in JOINs
 
 **Wrong:** `SELECT * FROM products INNER JOIN categories`
-**Right:** `SELECT * FROM products INNER JOIN categories ON products.category_id = categories.category_id`
+**Right:** `SELECT * FROM products INNER JOIN product_categories ON product_categories.product_id = products.product_id
+INNER JOIN categories ON categories.category_id = product_categories.category_id`
 
 ### 4.5 Wrong Table Creation Order
 
