@@ -41,13 +41,14 @@ Think of it like building a bridge network. Each JOIN clause is a bridge between
 customers (customer_id PK, first_name, last_name, email, city)
 orders (order_id PK, customer_id FK, order_date, status)
 order_items (order_item_id PK, order_id FK, product_id FK, quantity, unit_price)
-products (product_id PK, product_name, category_id FK, price, stock_quantity)
+products (product_id PK, product_name, price, stock_quantity)
+product_categories (product_id FK, category_id FK, PK(product_id, category_id))
 categories (category_id PK, category_name)
 ```
 
 #### Example: "List each customer's name, the products they ordered, and the category of each product"
 
-This requires **four** tables: customers → orders → order_items → products. Optionally five if you want category names.
+This requires **six** tables if you want category names: customers → orders → order_items → products → product_categories → categories.
 
 ```sql
 SELECT
@@ -60,7 +61,8 @@ FROM customers c
 JOIN orders o        ON o.customer_id = c.customer_id
 JOIN order_items oi  ON oi.order_id = o.order_id
 JOIN products p      ON p.product_id = oi.product_id
-JOIN categories cat  ON cat.category_id = p.category_id
+JOIN product_categories pc ON pc.product_id = p.product_id
+JOIN categories cat ON cat.category_id = pc.category_id
 ORDER BY c.last_name, p.product_name;
 ```
 
@@ -70,7 +72,7 @@ ORDER BY c.last_name, p.product_name;
 2. `JOIN orders` — links each customer to their orders via `customer_id`.
 3. `JOIN order_items` — links each order to its line items via `order_id`.
 4. `JOIN products` — links each line item to its product via `product_id`.
-5. `JOIN categories` — links each product to its category via `category_id`.
+5. `JOIN product_categories` then `JOIN categories` — a product can belong to many categories, so this junction resolves the M:N.
 
 Each step narrows or expands the result depending on whether matching rows exist. With INNER JOIN (the default), only rows that match *at every step* appear in the final result.
 
@@ -101,9 +103,11 @@ SELECT
     p2.price AS price_b,
     cat.category_name
 FROM products p1
-JOIN products p2 ON p1.category_id = p2.category_id
-                AND p1.product_id < p2.product_id
-JOIN categories cat ON cat.category_id = p1.category_id
+JOIN product_categories pc1 ON pc1.product_id = p1.product_id
+JOIN products p2 ON p1.product_id < p2.product_id
+JOIN product_categories pc2 ON pc2.product_id = p2.product_id
+                             AND pc2.category_id = pc1.category_id
+JOIN categories cat ON cat.category_id = pc1.category_id
 WHERE ABS(p1.price - p2.price) <= 5.00;
 ```
 
@@ -131,6 +135,7 @@ ORDER BY c1.city;
 INNER JOIN only returns rows that have a match in *both* tables. But sometimes you need to see **all** rows from one table, even if they have no match in the other.
 
 Real questions that require outer joins:
+
 - "Which customers have never placed an order?"
 - "Show all products, including those that have never been sold."
 - "List all categories, even empty ones."
@@ -168,6 +173,7 @@ WHERE o.order_id IS NULL;
 ```
 
 **How it works:**
+
 1. LEFT JOIN includes all customers, even those without orders.
 2. For customers without orders, all `orders` columns are NULL.
 3. `WHERE o.order_id IS NULL` filters to *only* those unmatched rows.
@@ -186,7 +192,8 @@ WHERE oi.order_item_id IS NULL;
 -- Categories with no products
 SELECT cat.category_name
 FROM categories cat
-LEFT JOIN products p ON p.category_id = cat.category_id
+LEFT JOIN product_categories pc ON pc.category_id = cat.category_id
+LEFT JOIN products p ON p.product_id = pc.product_id
 WHERE p.product_id IS NULL;
 ```
 
@@ -234,7 +241,8 @@ FROM customers c
 LEFT JOIN orders o ON o.customer_id = c.customer_id
 LEFT JOIN order_items oi ON oi.order_id = o.order_id
 LEFT JOIN products p ON p.product_id = oi.product_id
-JOIN categories cat ON cat.category_id = p.category_id;  -- This kills NULLs!
+JOIN product_categories pc ON pc.product_id = p.product_id
+JOIN categories cat ON cat.category_id = pc.category_id;  -- This kills NULLs!
 
 -- CORRECT: Use LEFT JOIN throughout
 SELECT c.first_name, p.product_name, cat.category_name
@@ -242,7 +250,8 @@ FROM customers c
 LEFT JOIN orders o ON o.customer_id = c.customer_id
 LEFT JOIN order_items oi ON oi.order_id = o.order_id
 LEFT JOIN products p ON p.product_id = oi.product_id
-LEFT JOIN categories cat ON cat.category_id = p.category_id;
+LEFT JOIN product_categories pc ON pc.product_id = p.product_id
+LEFT JOIN categories cat ON cat.category_id = pc.category_id;
 ```
 
 ---
@@ -256,6 +265,7 @@ A **subquery** (also called an inner query or nested query) is a SELECT statemen
 As Watt & Eng explain in Chapter 16 of *Database Design — 2nd Edition*, subqueries allow you to build complex queries by nesting simpler ones, using the result of one query as input to another.
 
 Subqueries are enclosed in parentheses and can appear in several places:
+
 - In the `WHERE` clause (most common)
 - In the `FROM` clause (derived tables)
 - In the `SELECT` clause (scalar subqueries)
@@ -263,12 +273,12 @@ Subqueries are enclosed in parentheses and can appear in several places:
 
 ### 3.2 Types of Subqueries
 
-| Type | Returns | Example Use |
-|------|---------|-------------|
-| Scalar subquery | Single value (one row, one column) | Compare with =, <, > |
-| Row subquery | Single row (multiple columns) | Compare with row constructors |
-| Table subquery | Multiple rows and columns | Use with IN, EXISTS, or in FROM |
-| Correlated subquery | Depends on outer row | Executes once per outer row |
+| Type                | Returns                            | Example Use                     |
+| ------------------- | ---------------------------------- | ------------------------------- |
+| Scalar subquery     | Single value (one row, one column) | Compare with =, <, >            |
+| Row subquery        | Single row (multiple columns)      | Compare with row constructors   |
+| Table subquery      | Multiple rows and columns          | Use with IN, EXISTS, or in FROM |
+| Correlated subquery | Depends on outer row               | Executes once per outer row     |
 
 ### 3.3 Scalar Subqueries
 
@@ -341,18 +351,21 @@ A **correlated subquery** references columns from the outer query. It executes *
 #### Example: "Products priced above the average for their category"
 
 ```sql
-SELECT p.product_name, p.price, p.category_id
+SELECT p.product_name, p.price
 FROM products p
 WHERE p.price > (
     SELECT AVG(p2.price)
     FROM products p2
-    WHERE p2.category_id = p.category_id  -- References outer query!
+    JOIN product_categories pc2 ON pc2.product_id = p2.product_id
+    JOIN product_categories pc1 ON pc1.product_id = p.product_id
+                               AND pc1.category_id = pc2.category_id
 );
 ```
 
 For each product in the outer query, PostgreSQL:
-1. Looks at that product's `category_id`
-2. Runs the subquery to compute the average price *for that category*
+
+1. Finds the categories that product belongs to (via `product_categories`)
+2. Runs the subquery to compute the average price *for those categories*
 3. Compares the product's price to that average
 
 **Performance implication**: Correlated subqueries can be slow on large tables because they execute once per outer row. Often, you can rewrite them as JOINs or window functions for better performance.
@@ -371,13 +384,11 @@ WHERE customer_id IN (
 );
 
 -- Products in the "Footwear" or "Accessories" categories
-SELECT product_name, price
-FROM products
-WHERE category_id IN (
-    SELECT category_id
-    FROM categories
-    WHERE category_name IN ('Footwear', 'Accessories')
-);
+SELECT p.product_name, p.price
+FROM products p
+JOIN product_categories pc ON pc.product_id = p.product_id
+JOIN categories c ON c.category_id = pc.category_id
+WHERE c.category_name IN ('Footwear', 'Accessories');
 ```
 
 ### 3.7 Subqueries with EXISTS and NOT EXISTS
@@ -426,7 +437,8 @@ FROM products
 WHERE price > ANY (
     SELECT p.price
     FROM products p
-    JOIN categories cat ON cat.category_id = p.category_id
+    JOIN product_categories pc ON pc.product_id = p.product_id
+JOIN categories cat ON cat.category_id = pc.category_id
     WHERE cat.category_name = 'Camping'
 );
 ```
@@ -443,7 +455,8 @@ FROM products
 WHERE price > ALL (
     SELECT p.price
     FROM products p
-    JOIN categories cat ON cat.category_id = p.category_id
+    JOIN product_categories pc ON pc.product_id = p.product_id
+JOIN categories cat ON cat.category_id = pc.category_id
     WHERE cat.category_name = 'Camping'
 );
 ```
@@ -452,15 +465,16 @@ WHERE price > ALL (
 
 ### 3.9 Subquery vs JOIN — Comparison
 
-| Aspect | Subquery | JOIN |
-|--------|----------|------|
-| Readability | Good for "does X exist?" questions | Good for "combine data from multiple tables" |
-| Performance | Correlated subqueries can be slow | Usually optimized well by PostgreSQL |
-| Result columns | Can only return outer query columns | Can return columns from all joined tables |
-| NULL handling | NOT EXISTS handles NULLs correctly | LEFT JOIN + IS NULL handles NULLs correctly |
-| Aggregation | Natural for comparisons with aggregates | Requires GROUP BY or derived tables |
+| Aspect         | Subquery                                | JOIN                                         |
+| -------------- | --------------------------------------- | -------------------------------------------- |
+| Readability    | Good for "does X exist?" questions      | Good for "combine data from multiple tables" |
+| Performance    | Correlated subqueries can be slow       | Usually optimized well by PostgreSQL         |
+| Result columns | Can only return outer query columns     | Can return columns from all joined tables    |
+| NULL handling  | NOT EXISTS handles NULLs correctly      | LEFT JOIN + IS NULL handles NULLs correctly  |
+| Aggregation    | Natural for comparisons with aggregates | Requires GROUP BY or derived tables          |
 
 **General guidance:**
+
 - Use **JOIN** when you need columns from both tables in the result.
 - Use **EXISTS/NOT EXISTS** when you're checking for the *existence* of related rows.
 - Use **scalar subqueries** when you need to compare against an aggregate.
@@ -477,6 +491,7 @@ Set operations combine the **results** of two or more SELECT statements into a s
 ### 4.1 Rules for Set Operations
 
 Both SELECT statements must:
+
 1. Return the **same number of columns**
 2. Have **compatible data types** in corresponding columns (e.g., both integers, or both text)
 
@@ -539,9 +554,13 @@ This is another way to find "unmatched" rows, alongside LEFT JOIN + IS NULL and 
 You can add `ORDER BY` and `LIMIT` at the end, after the last SELECT:
 
 ```sql
-SELECT product_name, price FROM products WHERE category_id = 1
+SELECT p.product_name, p.price FROM products p
+JOIN product_categories pc ON pc.product_id = p.product_id
+WHERE pc.category_id = 1
 UNION
-SELECT product_name, price FROM products WHERE category_id = 2
+SELECT p.product_name, p.price FROM products p
+JOIN product_categories pc ON pc.product_id = p.product_id
+WHERE pc.category_id = 2
 ORDER BY price DESC
 LIMIT 10;
 ```
@@ -744,6 +763,7 @@ DROP VIEW IF EXISTS customer_order_summary;  -- No error if it doesn't exist
 ### 6.6 Updatable Views vs Read-Only Views
 
 A view is **automatically updatable** in PostgreSQL if it meets these conditions:
+
 - Based on a single table (no joins)
 - No aggregate functions, GROUP BY, HAVING, DISTINCT
 - No set operations (UNION, etc.)
@@ -814,7 +834,8 @@ SELECT
         ELSE 'In stock'
     END AS availability
 FROM products p
-JOIN categories cat ON cat.category_id = p.category_id;
+JOIN product_categories pc ON pc.product_id = p.product_id
+JOIN categories cat ON cat.category_id = pc.category_id;
 
 -- View 2: Order details (flattened for reporting)
 CREATE VIEW order_details AS
@@ -839,7 +860,8 @@ SELECT
     COUNT(DISTINCT oi.order_item_id) AS times_ordered,
     COALESCE(SUM(oi.quantity * oi.unit_price), 0) AS total_revenue
 FROM categories cat
-LEFT JOIN products p ON p.category_id = cat.category_id
+LEFT JOIN product_categories pc ON pc.category_id = cat.category_id
+LEFT JOIN products p ON p.product_id = pc.product_id
 LEFT JOIN order_items oi ON oi.product_id = p.product_id
 GROUP BY cat.category_name;
 ```
@@ -898,11 +920,12 @@ You can define multiple CTEs, separated by commas. Later CTEs can reference earl
 WITH
 category_revenue AS (
     SELECT
-        p.category_id,
+        pc.category_id,
         SUM(oi.quantity * oi.unit_price) AS revenue
     FROM products p
+    JOIN product_categories pc ON pc.product_id = p.product_id
     JOIN order_items oi ON oi.product_id = p.product_id
-    GROUP BY p.category_id
+    GROUP BY pc.category_id
 ),
 avg_category_revenue AS (
     SELECT AVG(revenue) AS avg_revenue
@@ -954,6 +977,7 @@ SELECT * FROM category_tree ORDER BY depth, category_name;
 ```
 
 Recursive CTEs need:
+
 1. An **anchor member** (the non-recursive starting point)
 2. A **recursive member** (references the CTE itself, joined with a base table)
 3. A **termination condition** (usually implicit when no more rows match)
@@ -999,22 +1023,22 @@ The CTE version reads top-to-bottom: "First, compute customer totals. Then, sele
 
 ## 8. Key Terms
 
-| Term | Definition |
-|------|-----------|
-| Self-join | Joining a table to itself using different aliases |
-| Outer join | JOIN that preserves unmatched rows (LEFT, RIGHT, FULL) |
-| Subquery | A SELECT statement nested inside another statement |
-| Correlated subquery | Subquery that references the outer query; executes per outer row |
-| Scalar subquery | Subquery returning exactly one value |
-| Derived table | Subquery in the FROM clause; must have an alias |
-| EXISTS | Predicate that tests whether a subquery returns any rows |
-| Set operation | UNION, INTERSECT, or EXCEPT combining two query results |
-| CASE expression | Conditional logic that returns different values based on conditions |
-| COALESCE | Returns the first non-NULL argument |
-| View | Named stored query that acts as a virtual table |
-| Materialized view | View whose results are physically stored and must be refreshed |
-| CTE | Common Table Expression; temporary named result within WITH clause |
-| Recursive CTE | CTE that references itself for hierarchical/iterative queries |
+| Term                | Definition                                                          |
+| ------------------- | ------------------------------------------------------------------- |
+| Self-join           | Joining a table to itself using different aliases                   |
+| Outer join          | JOIN that preserves unmatched rows (LEFT, RIGHT, FULL)              |
+| Subquery            | A SELECT statement nested inside another statement                  |
+| Correlated subquery | Subquery that references the outer query; executes per outer row    |
+| Scalar subquery     | Subquery returning exactly one value                                |
+| Derived table       | Subquery in the FROM clause; must have an alias                     |
+| EXISTS              | Predicate that tests whether a subquery returns any rows            |
+| Set operation       | UNION, INTERSECT, or EXCEPT combining two query results             |
+| CASE expression     | Conditional logic that returns different values based on conditions |
+| COALESCE            | Returns the first non-NULL argument                                 |
+| View                | Named stored query that acts as a virtual table                     |
+| Materialized view   | View whose results are physically stored and must be refreshed      |
+| CTE                 | Common Table Expression; temporary named result within WITH clause  |
+| Recursive CTE       | CTE that references itself for hierarchical/iterative queries       |
 
 ---
 
