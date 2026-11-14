@@ -2,7 +2,7 @@
 
 ## Chapter 10: "Black Friday"
 
-It's November, and TrailShop is bracing for its biggest sale of the year. The founders are excited — but you're worried. What happens when 200 customers try to buy the last 50 pairs of Trail Runner X *at the same time*? What if the system crashes halfway through processing an order — money debited but items never shipped? What if two warehouse workers update the same stock count simultaneously?
+It's November, and TrailShop is bracing for its biggest sale of the year. The founders are excited — but you're worried. What happens when 200 customers try to buy the last 50 pairs of Trail Runner X _at the same time_? What if the system crashes halfway through processing an order — money debited but items never shipped? What if two warehouse workers update the same stock count simultaneously?
 
 These aren't hypothetical problems. They happen every day in production systems. The solution lies in **transactions** — the database's mechanism for guaranteeing correctness even when things go wrong or multiple operations happen simultaneously.
 
@@ -26,7 +26,43 @@ By the end of this chapter you will be able to:
 
 ---
 
+## How to Study This Chapter
+
+Fundamentals are what the project task and the exam expect. Advanced sections explain how PostgreSQL does the work, and they are helpful once the fundamentals are solid.
+
+### Fundamentals — focus here
+
+- **What a transaction is** (sections 1.1–1.3): one logical unit of work, the bank, ATM, and order analogies, and `BEGIN` … `COMMIT` / `ROLLBACK`.
+- **ACID** (section 2): each property, a TrailShop example, and what goes wrong when it fails. Durability names the write-ahead log only as “committed changes are written before the commit is confirmed.”
+- **Transaction control you will write** (sections 3.1–3.5): `BEGIN`, `COMMIT`, `ROLLBACK`, `SAVEPOINT`, and `ROLLBACK TO SAVEPOINT`.
+- **Autocommit** (sections 4.1–4.2): a lone statement is already its own transaction, and when to open an explicit one.
+- **One complete order** (section 5.1): insert the order, insert the items, decrease stock, and roll back if stock would go negative.
+- **The four concurrency problems** (section 6): dirty read, non-repeatable read, phantom read, and lost update, including that PostgreSQL never allows a dirty read.
+- **Isolation levels as a choice** (sections 7.1–7.5 and the summary in 7.7): what each level prevents, `READ COMMITTED` as the default, PostgreSQL treating `READ UNCOMMITTED` as `READ COMMITTED`, and PostgreSQL `REPEATABLE READ` also preventing phantom reads. The `BEGIN` plus `SET TRANSACTION` form in section 7.6.
+- **The lock you need** (sections 8.1–8.3 and 8.6): a writer locks the row, `SELECT … FOR UPDATE` stops a lost update, locks last until commit or rollback, and short transactions reduce waiting. A normal `SELECT` still works while a row is locked.
+- **MVCC in one idea** (section 9.1): readers do not block writers, and writers do not block readers, because PostgreSQL keeps more than one version of a row.
+- **What a deadlock is** (sections 10.1–10.3): two transactions wait on each other’s locks, and PostgreSQL aborts one of them so the application can retry. Locking rows in a consistent order (strategy 1 in section 10.4) is the practical way to avoid that example. Keeping transactions short (strategy 4) belongs with the same idea.
+
+### Advanced — extra and helpful
+
+> [!TIP]
+> **Advanced.** Helpful extra. Read this after the fundamentals in this section are solid.
+>
+> - **Syntax you will not be asked to recite** (sections 3.6–3.7): `RELEASE SAVEPOINT`, and the `WORK` / `TRANSACTION` / transaction-mode forms.
+> - **Turning autocommit off in psql** (section 4.3).
+> - **Extra transaction patterns** (sections 5.2–5.3): stock transfer and payment savepoints.
+> - **How stricter isolation is implemented**: the conflict error and retry note in section 7.4, Serializable Snapshot Isolation in section 7.5, and `SET SESSION CHARACTERISTICS` in section 7.6.
+> - **Other locks** (the variants in 8.3, plus 8.4 and 8.5): `FOR SHARE` and the key-share variants, the table lock-mode table, and advisory locks.
+> - **MVCC mechanics** (sections 9.2–9.6): old and new row versions, `xmin` / `xmax`, visibility rules, and `VACUUM`.
+> - **Deadlock tactics** (strategies 2, 3, and 5 in section 10.4): `lock_timeout`, `NOWAIT`, `SKIP LOCKED`, and using `SERIALIZABLE` so conflicts are aborted early. The detector’s one-second default in section 10.3 is part of this extra detail.
+
+The Required reading at the end of the chapter matches the fundamentals. Further Reading matches the advanced topics.
+
+---
+
 ## 1. What Is a Transaction?
+
+> **Fundamentals.** This whole section is core: the definition, the analogies, and where a transaction starts and ends.
 
 ### 1.1 Definition
 
@@ -37,6 +73,7 @@ A **transaction** is a sequence of one or more SQL operations that are treated a
 #### Bank Transfer
 
 When you transfer €100 from Account A to Account B:
+
 1. Debit €100 from Account A
 2. Credit €100 to Account B
 
@@ -76,6 +113,8 @@ Everything between BEGIN and COMMIT/ROLLBACK is one atomic unit.
 ---
 
 ## 2. ACID Properties
+
+> **Fundamentals.** This whole section is core. Learn each property, a TrailShop example, and what fails when it is missing.
 
 ACID is the set of guarantees that make transactions reliable. The term was coined by Andreas Reuter and Theo Härder in 1983.
 
@@ -118,6 +157,8 @@ Reference: [PostgreSQL — Transaction Isolation](https://www.postgresql.org/doc
 ---
 
 ## 3. Transaction Control
+
+> **Mixed.** Sections 3.1–3.5 (`BEGIN`, `COMMIT`, `ROLLBACK`, `SAVEPOINT`, `ROLLBACK TO SAVEPOINT`) are fundamentals. Sections 3.6–3.7 (`RELEASE SAVEPOINT` and the full syntax forms) are advanced.
 
 ### 3.1 BEGIN / START TRANSACTION
 
@@ -188,13 +229,16 @@ COMMIT;
 
 ### 3.5 ROLLBACK TO SAVEPOINT
 
-Rolls back all operations *after* the named savepoint, but keeps the transaction open and preserves everything before the savepoint.
+Rolls back all operations _after_ the named savepoint, but keeps the transaction open and preserves everything before the savepoint.
 
 ```sql
 ROLLBACK TO SAVEPOINT my_savepoint;
 ```
 
-### 3.6 RELEASE SAVEPOINT
+### 3.6 RELEASE SAVEPOINT (Advanced)
+
+> [!TIP]
+> **Advanced.** Helpful extra. Read this after the fundamentals in this section are solid.
 
 Removes a savepoint without rolling back. The savepoint is no longer available for rollback, but the work done after it is preserved.
 
@@ -204,7 +248,10 @@ RELEASE SAVEPOINT my_savepoint;
 
 This is useful for cleanup — it signals "I no longer need this checkpoint."
 
-### 3.7 Full Syntax Reference
+### 3.7 Full Syntax Reference (Advanced)
+
+> [!TIP]
+> **Advanced.** Helpful extra. Read this after the fundamentals in this section are solid.
 
 ```sql
 BEGIN [ WORK | TRANSACTION ] [ transaction_mode [, ...] ];
@@ -221,6 +268,8 @@ Reference: [PostgreSQL — SQL Commands](https://www.postgresql.org/docs/current
 
 ## 4. Autocommit Mode
 
+> **Mixed.** Sections 4.1–4.2 are fundamentals. Section 4.3 (turning autocommit off in psql) is advanced.
+
 ### 4.1 How PostgreSQL Handles It
 
 By default, PostgreSQL operates in **autocommit mode**: every individual SQL statement is automatically wrapped in its own transaction. If you type:
@@ -230,6 +279,7 @@ UPDATE products SET price = 99.99 WHERE product_id = 101;
 ```
 
 Without an explicit `BEGIN`, PostgreSQL internally does:
+
 ```sql
 BEGIN;
 UPDATE products SET price = 99.99 WHERE product_id = 101;
@@ -241,11 +291,15 @@ This means every statement is immediately committed. There's no way to undo it (
 ### 4.2 When to Use Explicit Transactions
 
 Use explicit `BEGIN ... COMMIT` when:
+
 - You have **multiple related statements** that must succeed or fail together.
 - You're doing **destructive operations** and want the ability to ROLLBACK.
 - You need a specific **isolation level**.
 
-### 4.3 Disabling Autocommit
+### 4.3 Disabling Autocommit (Advanced)
+
+> [!TIP]
+> **Advanced.** Helpful extra. Read this after the fundamentals in this section are solid.
 
 In `psql`, autocommit is controlled by the `\set AUTOCOMMIT off` variable:
 
@@ -258,6 +312,8 @@ Now every statement starts an implicit transaction that you must explicitly COMM
 ---
 
 ## 5. Complete TrailShop Transaction Examples
+
+> **Mixed.** Section 5.1 (the order transaction) is fundamental. Sections 5.2–5.3 (stock transfer and payment savepoints) are advanced.
 
 ### 5.1 Order Processing
 
@@ -282,7 +338,7 @@ UPDATE products SET stock_quantity = stock_quantity - 1 WHERE product_id = 202;
 -- 4. Verify stock didn't go negative (optional explicit check)
 DO $$
 BEGIN
-    IF EXISTS (SELECT 1 FROM products WHERE product_id IN (101, 202) AND stock_quantity < 0) THEN
+    IF EXISTS (ECT SELECT 1 FROM products WHERE product_id IN (101, 202) AND stock_quantity < 0) THEN
         RAISE EXCEPTION 'Insufficient stock';
     END IF;
 END $$;
@@ -290,9 +346,12 @@ END $$;
 COMMIT;
 ```
 
-If *any* step fails — the entire order, all item inserts, and all stock updates are undone.
+If _any_ step fails — the entire order, all item inserts, and all stock updates are undone.
 
-### 5.2 Stock Transfer Between Stores (Hypothetical)
+### 5.2 Stock Transfer Between Stores (Hypothetical, Advanced)
+
+> [!TIP]
+> **Advanced.** Helpful extra. Read this after the fundamentals in this section are solid.
 
 ```sql
 BEGIN;
@@ -318,7 +377,10 @@ WHERE store_id = 2 AND product_id = 101;
 COMMIT;
 ```
 
-### 5.3 Payment Processing (Simplified)
+### 5.3 Payment Processing (Simplified, Advanced)
+
+> [!TIP]
+> **Advanced.** Helpful extra. Read this after the fundamentals in this section are solid.
 
 ```sql
 BEGIN;
@@ -345,6 +407,8 @@ COMMIT;
 ---
 
 ## 6. Concurrency Problems
+
+> **Fundamentals.** This whole section is core. Learn all four problems, and that PostgreSQL never allows a dirty read.
 
 When multiple transactions execute simultaneously, they can interfere with each other. These are the four classic problems.
 
@@ -452,20 +516,22 @@ T6      -- Final stock: 8 (should be 5!)
 
 ## 7. Isolation Levels
 
+> **Mixed.** Sections 7.1–7.5 and 7.7 are fundamentals, including the `BEGIN` plus `SET TRANSACTION` form in 7.6. The serialization-error retry note in 7.4, Serializable Snapshot Isolation in 7.5, and `SET SESSION CHARACTERISTICS` in 7.6 are advanced.
+
 Isolation levels control how much transactions can "see" each other's work. Higher isolation = fewer problems, but potentially lower performance.
 
 Reference: [PostgreSQL — Transaction Isolation](https://www.postgresql.org/docs/current/transaction-iso.html)
 
 ### 7.1 The Four SQL Standard Isolation Levels
 
-| Level | Dirty Read | Non-Repeatable Read | Phantom Read |
-|-------|-----------|-------------------|--------------|
-| READ UNCOMMITTED | Possible | Possible | Possible |
-| READ COMMITTED | Prevented | Possible | Possible |
-| REPEATABLE READ | Prevented | Prevented | Possible* |
-| SERIALIZABLE | Prevented | Prevented | Prevented |
+| Level            | Dirty Read | Non-Repeatable Read | Phantom Read |
+| ---------------- | ---------- | ------------------- | ------------ |
+| READ UNCOMMITTED | Possible   | Possible            | Possible     |
+| READ COMMITTED   | Prevented  | Possible            | Possible     |
+| REPEATABLE READ  | Prevented  | Prevented           | Possible\*   |
+| SERIALIZABLE     | Prevented  | Prevented           | Prevented    |
 
-*In PostgreSQL, REPEATABLE READ also prevents phantom reads (stricter than the SQL standard requires).
+\*In PostgreSQL, REPEATABLE READ also prevents phantom reads (stricter than the SQL standard requires).
 
 ### 7.2 READ UNCOMMITTED
 
@@ -480,7 +546,7 @@ SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 
 ### 7.3 READ COMMITTED (PostgreSQL Default)
 
-Each statement within a transaction sees only data committed *before that statement began*. Different statements within the same transaction can see different committed data.
+Each statement within a transaction sees only data committed _before that statement began_. Different statements within the same transaction can see different committed data.
 
 ```sql
 BEGIN;
@@ -519,15 +585,20 @@ COMMIT;
 
 **PostgreSQL bonus**: In PostgreSQL, REPEATABLE READ also prevents phantom reads (thanks to MVCC/snapshot isolation).
 
+> [!TIP]
+> **Advanced.** Helpful extra.
+
 **Conflict handling**: If your transaction tries to UPDATE a row that another committed transaction already modified, PostgreSQL throws:
+
 ```
 ERROR: could not serialize access due to concurrent update
 ```
+
 Your application must catch this and retry the transaction.
 
 ### 7.5 SERIALIZABLE
 
-The strictest level. Guarantees that concurrent transactions produce the same result as if they ran one after another (serially). PostgreSQL uses **Serializable Snapshot Isolation (SSI)** to detect conflicts.
+The strictest level. Guarantees that concurrent transactions produce the same result as if they ran one after another (serially).
 
 ```sql
 BEGIN;
@@ -544,6 +615,11 @@ COMMIT;
 
 **Trade-off**: More transactions may be aborted and need retry logic.
 
+> [!TIP]
+> **Advanced.** Helpful extra.
+
+PostgreSQL uses **Serializable Snapshot Isolation (SSI)** to detect conflicts.
+
 ### 7.6 Setting Isolation Levels
 
 ```sql
@@ -557,25 +633,32 @@ COMMIT;
 BEGIN TRANSACTION ISOLATION LEVEL SERIALIZABLE;
 -- ...
 COMMIT;
+```
 
+> [!TIP]
+> **Advanced.** Helpful extra.
+
+```sql
 -- For the entire session:
 SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL SERIALIZABLE;
 ```
 
 ### 7.7 PostgreSQL-Specific Behavior Summary
 
-| Feature | PostgreSQL Behavior |
-|---------|-------------------|
-| READ UNCOMMITTED | Treated as READ COMMITTED |
-| Dirty reads | Never possible (not even at READ UNCOMMITTED) |
-| REPEATABLE READ | Also prevents phantom reads (stricter than standard) |
-| Default level | READ COMMITTED |
-| Conflict resolution | Aborts transaction with serialization error |
-| Implementation | MVCC (Multi-Version Concurrency Control) |
+| Feature             | PostgreSQL Behavior                                  |
+| ------------------- | ---------------------------------------------------- |
+| READ UNCOMMITTED    | Treated as READ COMMITTED                            |
+| Dirty reads         | Never possible (not even at READ UNCOMMITTED)        |
+| REPEATABLE READ     | Also prevents phantom reads (stricter than standard) |
+| Default level       | READ COMMITTED                                       |
+| Conflict resolution | Aborts transaction with serialization error          |
+| Implementation      | MVCC (Multi-Version Concurrency Control)             |
 
 ---
 
 ## 8. Locking
+
+> **Mixed.** Sections 8.1–8.2, the basic `SELECT … FOR UPDATE` in 8.3, and 8.6 are fundamentals. The `FOR SHARE` and key-share variants in 8.3, the table lock modes in 8.4, and advisory locks in 8.5 are advanced.
 
 ### 8.1 Why Locks Exist
 
@@ -616,12 +699,20 @@ COMMIT;
 This solves the **lost update** problem! By locking the row before reading, you ensure no one else modifies it between your read and your write.
 
 **Variants:**
+
 - `FOR UPDATE` — strongest; blocks other FOR UPDATE, UPDATE, DELETE
+
+> [!TIP]
+> **Advanced.** Helpful extra.
+
 - `FOR NO KEY UPDATE` — blocks updates but allows operations that don't affect the key
 - `FOR SHARE` — allows other FOR SHARE but blocks FOR UPDATE
 - `FOR KEY SHARE` — weakest; only blocks operations that modify the key
 
-### 8.4 Table-Level Locks
+### 8.4 Table-Level Locks (Advanced)
+
+> [!TIP]
+> **Advanced.** Helpful extra. Read this after the fundamentals in this section are solid.
 
 Some operations require locking entire tables:
 
@@ -631,14 +722,17 @@ LOCK TABLE products IN ACCESS EXCLUSIVE MODE;
 
 Table locks are rarely needed in application code. PostgreSQL acquires them automatically for DDL operations (ALTER TABLE, DROP TABLE).
 
-| Lock Mode | Conflicts With | Used For |
-|-----------|---------------|----------|
-| ACCESS SHARE | ACCESS EXCLUSIVE | SELECT |
-| ROW SHARE | EXCLUSIVE, ACCESS EXCLUSIVE | SELECT FOR UPDATE |
-| ROW EXCLUSIVE | SHARE, SHARE ROW EXCLUSIVE, EXCLUSIVE, ACCESS EXCLUSIVE | UPDATE, INSERT, DELETE |
-| ACCESS EXCLUSIVE | All modes | ALTER TABLE, DROP TABLE |
+| Lock Mode        | Conflicts With                                          | Used For                |
+| ---------------- | ------------------------------------------------------- | ----------------------- |
+| ACCESS SHARE     | ACCESS EXCLUSIVE                                        | SELECT                  |
+| ROW SHARE        | EXCLUSIVE, ACCESS EXCLUSIVE                             | SELECT FOR UPDATE       |
+| ROW EXCLUSIVE    | SHARE, SHARE ROW EXCLUSIVE, EXCLUSIVE, ACCESS EXCLUSIVE | UPDATE, INSERT, DELETE  |
+| ACCESS EXCLUSIVE | All modes                                               | ALTER TABLE, DROP TABLE |
 
-### 8.5 Advisory Locks (Brief)
+### 8.5 Advisory Locks (Brief, Advanced)
+
+> [!TIP]
+> **Advanced.** Helpful extra. Read this after the fundamentals in this section are solid.
 
 Application-defined locks that don't correspond to any table or row. Useful for coordinating application-level logic:
 
@@ -665,23 +759,33 @@ Advisory locks are managed entirely by your application — PostgreSQL just prov
 
 ## 9. MVCC — Multi-Version Concurrency Control
 
+> **Mixed.** Section 9.1 is fundamental: readers and writers do not block each other, because PostgreSQL keeps more than one version of a row. Sections 9.2–9.6 (row versions, `xmin` / `xmax`, visibility rules, and `VACUUM`) are advanced.
+
 ### 9.1 The Key Insight
 
 Traditional locking databases make readers wait for writers and writers wait for readers. PostgreSQL takes a different approach: **readers never block writers, and writers never block readers**.
 
 How? By keeping **multiple versions** of each row.
 
-### 9.2 How It Works
+### 9.2 How It Works (Advanced)
+
+> [!TIP]
+> **Advanced.** Helpful extra. Read this after the fundamentals in this section are solid.
 
 When a transaction updates a row, PostgreSQL doesn't overwrite the old row. Instead, it:
+
 1. Marks the old version as "expired" (but doesn't delete it yet).
 2. Creates a **new version** of the row with the updated values.
 
 Both versions coexist temporarily. Different transactions see different versions depending on their snapshot.
 
-### 9.3 Transaction IDs (XIDs)
+### 9.3 Transaction IDs (XIDs, Advanced)
+
+> [!TIP]
+> **Advanced.** Helpful extra. Read this after the fundamentals in this section are solid.
 
 Every transaction gets a unique, incrementing **transaction ID (XID)**. Each row version has two hidden system columns:
+
 - `xmin` — the XID of the transaction that created this version
 - `xmax` — the XID of the transaction that deleted/updated this version (0 if still "live")
 
@@ -690,19 +794,29 @@ Every transaction gets a unique, incrementing **transaction ID (XID)**. Each row
 SELECT xmin, xmax, * FROM products WHERE product_id = 101;
 ```
 
-### 9.4 Visibility Rules (High-Level)
+### 9.4 Visibility Rules (High-Level, Advanced)
+
+> [!TIP]
+> **Advanced.** Helpful extra. Read this after the fundamentals in this section are solid.
 
 A row version is visible to a transaction if:
+
 1. The creating transaction (`xmin`) committed **before** the reading transaction's snapshot.
 2. The row hasn't been deleted/updated by a committed transaction that's visible to the reader.
 
 This is how PostgreSQL implements REPEATABLE READ — the transaction takes a snapshot at the start and only sees versions created by transactions that committed before the snapshot.
 
-### 9.5 Why Readers Don't Block Writers
+### 9.5 Why Readers Don't Block Writers (Advanced)
 
-When Transaction A reads product 101, it reads the version visible to its snapshot. When Transaction B updates product 101, it creates a *new* version. A still sees the old version; B works with the new version. No conflict, no waiting.
+> [!TIP]
+> **Advanced.** Helpful extra. Read this after the fundamentals in this section are solid.
 
-### 9.6 VACUUM — Cleaning Up Old Versions
+When Transaction A reads product 101, it reads the version visible to its snapshot. When Transaction B updates product 101, it creates a _new_ version. A still sees the old version; B works with the new version. No conflict, no waiting.
+
+### 9.6 VACUUM — Cleaning Up Old Versions (Advanced)
+
+> [!TIP]
+> **Advanced.** Helpful extra. Read this after the fundamentals in this section are solid.
 
 Old row versions (no longer visible to any active transaction) accumulate as "dead tuples." The `VACUUM` process reclaims this space:
 
@@ -717,6 +831,8 @@ PostgreSQL's **autovacuum** runs automatically in the background. You rarely nee
 
 ## 10. Deadlocks
 
+> **Mixed.** Sections 10.1–10.3, lock ordering (strategy 1), and keeping transactions short (strategy 4) are fundamentals. The detector’s one-second default in 10.3, and strategies 2, 3, and 5 (`lock_timeout`, `NOWAIT`, `SKIP LOCKED`, and `SERIALIZABLE`), are advanced.
+
 ### 10.1 What Is a Deadlock?
 
 A **deadlock** occurs when two or more transactions each hold a lock that the other needs, creating a circular wait from which neither can proceed.
@@ -727,7 +843,7 @@ A **deadlock** occurs when two or more transactions each hold a lock that the ot
 Time    Transaction A                Transaction B
 ─────   ────────────────────────     ────────────────────────
 T1      BEGIN                        BEGIN
-T2      UPDATE products              
+T2      UPDATE products
         SET stock = stock - 1
         WHERE product_id = 101;
         -- Locks row 101
@@ -748,7 +864,12 @@ T6      -- DEADLOCK! Both waiting for each other forever.
 
 ### 10.3 How PostgreSQL Detects Deadlocks
 
-PostgreSQL runs a **deadlock detector** (by default every second, controlled by `deadlock_timeout`). When detected, PostgreSQL **aborts one** of the transactions:
+When detected, PostgreSQL **aborts one** of the transactions. The aborted transaction must be retried by the application.
+
+> [!TIP]
+> **Advanced.** Helpful extra.
+
+PostgreSQL runs a **deadlock detector** (by default every second, controlled by `deadlock_timeout`):
 
 ```
 ERROR: deadlock detected
@@ -758,8 +879,6 @@ DETAIL: Process 1234 waits for ShareLock on transaction 5678;
         blocked by process 1234.
 HINT: See server log for query details.
 ```
-
-The aborted transaction must be retried by the application.
 
 ### 10.4 Prevention Strategies
 
@@ -775,7 +894,10 @@ UPDATE products SET stock = stock - 1 WHERE product_id = 202;
 COMMIT;
 ```
 
-#### Strategy 2: Lock Timeout
+#### Strategy 2: Lock Timeout (Advanced)
+
+> [!TIP]
+> **Advanced.** Helpful extra. Read this after the fundamentals in this section are solid.
 
 Set a maximum time to wait for a lock:
 
@@ -785,7 +907,10 @@ SET lock_timeout = '5s';
 -- instead of waiting indefinitely
 ```
 
-#### Strategy 3: Use SELECT FOR UPDATE with NOWAIT or SKIP LOCKED
+#### Strategy 3: Use SELECT FOR UPDATE with NOWAIT or SKIP LOCKED (Advanced)
+
+> [!TIP]
+> **Advanced.** Helpful extra. Read this after the fundamentals in this section are solid.
 
 ```sql
 -- NOWAIT: fail immediately if row is locked
@@ -803,7 +928,10 @@ FOR UPDATE SKIP LOCKED;
 
 The shorter the transaction, the less time locks are held, and the smaller the window for deadlocks.
 
-#### Strategy 5: Use Higher Isolation Levels
+#### Strategy 5: Use Higher Isolation Levels (Advanced)
+
+> [!TIP]
+> **Advanced.** Helpful extra. Read this after the fundamentals in this section are solid.
 
 At SERIALIZABLE level, PostgreSQL may abort transactions before deadlocks form, using its SSI conflict detection.
 
@@ -811,51 +939,60 @@ At SERIALIZABLE level, PostgreSQL may abort transactions before deadlocks form, 
 
 ## 11. Key Terms
 
-| Term | Definition |
-|------|-----------|
-| Transaction | A sequence of operations treated as a single atomic unit |
-| ACID | Atomicity, Consistency, Isolation, Durability |
-| Atomicity | All operations succeed or none take effect |
-| Consistency | Database moves from one valid state to another |
-| Isolation | Concurrent transactions don't interfere with each other |
-| Durability | Committed data survives system failures |
-| COMMIT | Makes transaction's changes permanent |
-| ROLLBACK | Undoes all changes in the current transaction |
-| SAVEPOINT | Named checkpoint within a transaction for partial rollback |
-| Autocommit | Mode where each statement is its own transaction |
-| Dirty read | Reading uncommitted data from another transaction |
-| Non-repeatable read | Reading same row twice gets different values |
-| Phantom read | Re-executing a query gets different set of rows |
-| Lost update | Two transactions overwrite each other's changes |
-| Isolation level | Setting that controls what concurrency problems are prevented |
-| READ COMMITTED | Default in PostgreSQL; sees only committed data per statement |
-| REPEATABLE READ | Sees a snapshot from transaction start |
-| SERIALIZABLE | Guarantees serial equivalence |
-| Row-level lock | Lock on individual rows allowing maximum concurrency |
-| SELECT FOR UPDATE | Explicitly locks rows for upcoming modification |
-| MVCC | Multi-Version Concurrency Control; multiple row versions coexist |
-| Deadlock | Circular wait where transactions block each other permanently |
-| WAL | Write-Ahead Log; ensures durability by logging before applying |
+> **Fundamentals.** Every term in this glossary is core vocabulary. The Level column marks that. Advanced mechanisms such as `VACUUM`, advisory locks, and `SKIP LOCKED` are explained in the chapter, and they are extra.
+
+| Term                | Level       | Definition                                                       |
+| ------------------- | ----------- | ---------------------------------------------------------------- |
+| Transaction         | Fundamental | A sequence of operations treated as a single atomic unit         |
+| ACID                | Fundamental | Atomicity, Consistency, Isolation, Durability                    |
+| Atomicity           | Fundamental | All operations succeed or none take effect                       |
+| Consistency         | Fundamental | Database moves from one valid state to another                   |
+| Isolation           | Fundamental | Concurrent transactions don't interfere with each other          |
+| Durability          | Fundamental | Committed data survives system failures                          |
+| COMMIT              | Fundamental | Makes transaction's changes permanent                            |
+| ROLLBACK            | Fundamental | Undoes all changes in the current transaction                    |
+| SAVEPOINT           | Fundamental | Named checkpoint within a transaction for partial rollback       |
+| Autocommit          | Fundamental | Mode where each statement is its own transaction                 |
+| Dirty read          | Fundamental | Reading uncommitted data from another transaction                |
+| Non-repeatable read | Fundamental | Reading same row twice gets different values                     |
+| Phantom read        | Fundamental | Re-executing a query gets different set of rows                  |
+| Lost update         | Fundamental | Two transactions overwrite each other's changes                  |
+| Isolation level     | Fundamental | Setting that controls what concurrency problems are prevented    |
+| READ COMMITTED      | Fundamental | Default in PostgreSQL; sees only committed data per statement    |
+| REPEATABLE READ     | Fundamental | Sees a snapshot from transaction start                           |
+| SERIALIZABLE        | Fundamental | Guarantees serial equivalence                                    |
+| Row-level lock      | Fundamental | Lock on individual rows allowing maximum concurrency             |
+| SELECT FOR UPDATE   | Fundamental | Explicitly locks rows for upcoming modification                  |
+| MVCC                | Fundamental | Multi-Version Concurrency Control; multiple row versions coexist |
+| Deadlock            | Fundamental | Circular wait where transactions block each other permanently    |
+| WAL                 | Fundamental | Write-Ahead Log; ensures durability by logging before applying   |
 
 ---
 
 ## 12. Reading
+
+> **Mixed.** The Required list is fundamental. Further Reading is advanced.
 
 ### Required
 
 - PostgreSQL Documentation: [Tutorial — Transactions](https://www.postgresql.org/docs/current/tutorial-transactions.html)
 - PostgreSQL Documentation: [Transaction Isolation](https://www.postgresql.org/docs/current/transaction-iso.html)
 
-### Further Reading
+### Further Reading (Advanced)
+
+> [!TIP]
+> **Advanced.** Helpful extra. Read this after the fundamentals in this section are solid.
 
 - PostgreSQL Documentation: [Explicit Locking](https://www.postgresql.org/docs/current/explicit-locking.html)
 - PostgreSQL Documentation: [MVCC Introduction](https://www.postgresql.org/docs/current/mvcc-intro.html)
 - PostgreSQL Documentation: [Routine Vacuuming](https://www.postgresql.org/docs/current/routine-vacuuming.html)
-- Kleppmann, M. (2017). *Designing Data-Intensive Applications*, Chapter 7: Transactions.
+- Kleppmann, M. (2017). _Designing Data-Intensive Applications_, Chapter 7: Transactions.
 
 ---
 
 ## 13. Summary
+
+> **Fundamentals.** This recap is the core of the chapter. The locking, MVCC, and deadlock lines are the fundamental ideas.
 
 This chapter covered the mechanisms that keep databases correct under real-world conditions:
 
@@ -872,4 +1009,4 @@ This chapter covered the mechanisms that keep databases correct under real-world
 
 ## Coming Next: Week 47 — Indexing and Performance
 
-Your database is correct and handles concurrency — but is it *fast*? Next week you'll learn how indexes work under the hood, when to create them, and how to use EXPLAIN ANALYZE to find and fix slow queries. TrailShop's Black Friday traffic demands performance.
+Your database is correct and handles concurrency — but is it _fast_? Next week you'll learn how indexes work under the hood, when to create them, and how to use EXPLAIN ANALYZE to find and fix slow queries. TrailShop's Black Friday traffic demands performance.

@@ -1,7 +1,7 @@
 # Week 46 — Transactions and Concurrency: Exercises
 
 > [!IMPORTANT]
-> ***How to Complete These Exercises***
+> **_How to Complete These Exercises_**
 > Write your answers directly in the highlighted **Your Answer** / **Your SQL** fields below each task. Replace the placeholder text with your own work before submitting.
 
 ---
@@ -17,20 +17,31 @@ Write a complete transaction that processes a new order in TrailShop:
 3. Decrease `stock_quantity` for each ordered product.
 4. Include a check that stock doesn't go negative (if it would, ROLLBACK).
 5. Use a SAVEPOINT before the stock update step.
-> [!NOTE]
-> ***Your SQL***
->
-> ```sql
-> -- Write your query here
->
->
-> ```
+   > [!NOTE]
+   > **_Your SQL_**
+   >
+   > ```sql
+   > BEGIN;
+   > INSERT INTO orders (customer_id, order_date, status)
+   > VALUES (1, CURRENT_DATE, 'Pending');
+   > INSERT INTO order_items (order_id, product_id, quantity, unit_price)
+   > VALUES (currval('orders_order_id_seq'), 5, 2, 59.90), (currval('orders_order_id_seq'), 1, 1, 164.89);
+   > SAVEPOINT before_stock_update;
+   > UPDATE products SET stock_quantity = stock_quantity - 2 WHERE product_id = 5;
+   > UPDATE products SET stock_quantity = stock_quantity - 1 WHERE product_id = 1;
+   > COMMIT;
+   > ```
+   >
 
 Test the transaction by:
+
 - Running it successfully with sufficient stock.
 - Running it where stock is insufficient — verify the ROLLBACK works.
 
-### Task 1.2: Observe READ COMMITTED Behavior
+### Task 1.2: Observe READ COMMITTED Behavior (Optional)
+
+> [!TIP]
+> **Recommended practice.** Do Tasks 1.2–1.4. They are not required to finish the TrailShop project. They prepare you for the exams.
 
 Open two psql sessions (or two query windows). Demonstrate a non-repeatable read:
 
@@ -41,7 +52,7 @@ Open two psql sessions (or two query windows). Demonstrate a non-repeatable read
 
 Document what you observe and explain why it happens at READ COMMITTED.
 
-### Task 1.3: Observe Locking
+### Task 1.3: Observe Locking (Optional)
 
 Open two sessions and demonstrate row-level locking:
 
@@ -51,30 +62,22 @@ Open two sessions and demonstrate row-level locking:
 
 Document the behavior.
 
-### Task 1.4: Experiment with Isolation Levels
+### Task 1.4: Experiment with Isolation Levels (Optional)
 
 1. Repeat Task 1.2, but set Session A to `REPEATABLE READ`. Does the non-repeatable read still occur?
 
-
 > [!NOTE]
-> ***Your Answer***
+> **_Your Answer_**
 >
-> *(Write your answer here.)*
->
->
->
->
+> _(Write your answer here.)_
+
 2. In a REPEATABLE READ transaction, try to UPDATE a row that another transaction has already committed a change to. What error do you get?
 
-
 > [!NOTE]
-> ***Your Answer***
+> **_Your Answer_**
 >
-> *(Write your answer here.)*
->
->
->
->
+> _(Write your answer here.)_
+
 3. Document the differences between READ COMMITTED and REPEATABLE READ behavior.
 
 ---
@@ -86,123 +89,79 @@ Answer in your own words (2–4 sentences each):
 1. What is a transaction, and why is it important for data integrity?
 
 > [!NOTE]
-> ***Your Answer***
+> **_Your Answer_**
 >
-> *(Write your answer here.)*
->
->
->
->
-
+> A **transaction** is a sequence of one or more SQL operations that are treated as a **single logical unit of work.** It prevents, that the database is in an inconsistent or corrupted state, when the system crashes or an error occures.
 
 2. Explain the Atomicity property using a real-world example (not from the lecture notes).
 
 > [!NOTE]
-> ***Your Answer***
+> **_Your Answer_**
 >
-> *(Write your answer here.)*
->
->
->
->
+> Atomicity says either the queries gets completely through or no part of it. In a real word, for example if you want to insert a new product from a new supplier and you somehow had a typo and wrote the price negative, the entire operation gets cancelled even if there were rows already inserted.
+
 3. What does Isolation guarantee? Why is it needed in a multi-user system?
 
 > [!NOTE]
-> ***Your Answer***
+> **_Your Answer_**
 >
-> *(Write your answer here.)*
->
->
->
->
-
+> _It guarantees, that one single transaction executes by itself without effecting others. It is needed in a multi-user system, because when multiple users would make transactions at the same time, without isolation it wouldnt be possible._
 
 4. What is the difference between COMMIT and ROLLBACK?
 
 > [!NOTE]
-> ***Your Answer***
+> **_Your Answer_**
 >
-> *(Write your answer here.)*
->
->
->
->
-
+> _COMMIT is the command, that confirms, that the transaction was successful. ROLLBACK gets you back to your savepoint, when the transaction failed._
 
 5. Explain what a SAVEPOINT is and give a scenario where it's useful.
 
 > [!NOTE]
-> ***Your Answer***
+> **_Your Answer_**
 >
-> *(Write your answer here.)*
->
->
->
->
+> Like the name says it already, a savepoint saves the transaction at that point, where you insert it. You can than jump back to that savepoint, when the transaction failed und you execute the ROLLBACK command. Its useful, when the transaction is very long or when you are not sure, about something in the transaction (for example, how the quantity is).
+
 6. What is a dirty read? Why does PostgreSQL never allow it?
 
 > [!NOTE]
-> ***Your Answer***
+> **_Your Answer_**
 >
-> *(Write your answer here.)*
->
->
->
->
-
+> Transaction A reads data that Transaction B has written but **not yet committed**. If B rolls back, A has read data that never officially existed. Because it can cause major trouble and can crash the database.
 
 7. Describe the lost update problem. How can SELECT FOR UPDATE prevent it?
 
 > [!NOTE]
-> ***Your Answer***
+> **_Your Answer_**
 >
-> *(Write your answer here.)*
->
->
->
->
-
+> Two transactions read the same value, both modify it based on what they read, and one overwrites the other's change. SELECT FOR UPDATE locks rows for future UPDATE, preventing other transactions from modifying them.
 
 8. What is the default isolation level in PostgreSQL? What concurrency problems does it still allow?
 
 > [!NOTE]
-> ***Your Answer***
+> **_Your Answer_**
 >
-> *(Write your answer here.)*
->
->
->
->
-
+> The default isolation level is READ COMMITTED. While it prevents dirty reads, it still allows non-repeatable reads, phantom reads, and lost updates.
 
 9. Explain MVCC in one paragraph: what is it, and what advantage does it provide?
 
 > [!NOTE]
-> ***Your Answer***
+> **_Your Answer_**
 >
-> *(Write your answer here.)*
->
->
->
->
-
+> MVCC stands for multi-version concurrency control. Traditional locking databases make readers wait for writers and writers wait for readers. PostgreSQL takes a different approach: **readers never block writers, and writers never block readers**. It gives you that advantage, that writers and readers can work simultanously by not blocking each other by keeping multiple versions of each row.
 
 10. What is a deadlock, and how does PostgreSQL handle it when one is detected?
 
 > [!NOTE]
-> ***Your Answer***
+> **_Your Answer_**
 >
-> *(Write your answer here.)*
->
->
->
->
-
-
+> A **deadlock** occurs when two or more transactions each hold a lock that the other needs, creating a circular wait from which neither can proceed. When detected, PostgreSQL **aborts one** of the transactions. The aborted transaction must be retried by the application.
 
 ---
 
-## 3. Scenario Analysis
+## 3. Scenario Analysis (Optional)
+
+> [!TIP]
+> **Recommended practice.** Do this section. It is not required to finish the TrailShop project. It prepares you for the exams.
 
 For each scenario, identify: (a) which concurrency problem occurs, and (b) at which isolation level(s) it can happen.
 
@@ -220,7 +179,10 @@ Two warehouse workers simultaneously check stock for product 101 (both see 10). 
 
 ---
 
-## 4. Transaction Writing
+## 4. Transaction Writing (Optional)
+
+> [!TIP]
+> **Recommended practice.** Do this section. It is not required to finish the TrailShop project. It prepares you for the exams.
 
 Write complete SQL transactions for the following TrailShop scenarios. Include BEGIN, appropriate operations, error handling (SAVEPOINT where useful), and COMMIT.
 
@@ -231,36 +193,27 @@ Update the price of all products in the "Footwear" category by +10%. If any prod
 ### Transaction 2: Customer Account Deletion
 
 Delete a customer and all their associated data:
+
 1. Delete their order_items (for all their orders)
 
 > [!NOTE]
-> ***Your Answer***
+> **_Your Answer_**
 >
-> *(Write your answer here.)*
->
->
->
->
+> _(Write your answer here.)_
+
 2. Delete their orders
 
 > [!NOTE]
-> ***Your Answer***
+> **_Your Answer_**
 >
-> *(Write your answer here.)*
->
->
->
->
+> _(Write your answer here.)_
+
 3. Delete the customer record
 
 > [!NOTE]
-> ***Your Answer***
+> **_Your Answer_**
 >
-> *(Write your answer here.)*
->
->
->
->
+> _(Write your answer here.)_
 
 Use SAVEPOINTs between each step in case of errors.
 
@@ -282,3 +235,19 @@ For each statement, write TRUE or FALSE and briefly explain why.
 6. If a deadlock occurs, PostgreSQL will wait indefinitely for it to resolve.
 7. MVCC means PostgreSQL keeps multiple versions of each row, allowing readers and writers to work concurrently without blocking.
 8. Once a transaction is committed, its changes can be undone with ROLLBACK.
+
+---
+
+## Submission Checklist
+
+**Required**
+
+- [ ] Order transaction written and tested, including the insufficient-stock rollback (Task 1.1)
+- [ ] Theory review questions answered
+- [ ] True/False questions answered with a short explanation
+
+**Recommended practice**
+
+- [ ] READ COMMITTED, locking, and isolation-level experiments documented (Tasks 1.2–1.4)
+- [ ] Scenario analysis completed
+- [ ] Extra transactions written

@@ -81,6 +81,7 @@ Before you can design anything, you need to understand what the business needs. 
 For TrailShop, a requirements document might include:
 
 **Data Requirements:**
+
 - The system must store product information including name, description, price, weight, and stock quantity
 - Products are organized into categories; each product belongs to exactly one category
 - The system must track customers with contact information and addresses
@@ -88,6 +89,7 @@ For TrailShop, a requirements document might include:
 - Each order contains one or more items, each referencing a product with a quantity and the unit price at the time of ordering
 
 **Business Rules:**
+
 - Product prices must be positive
 - Stock quantity cannot be negative
 - A product may belong to many categories (and a category to many products)
@@ -113,6 +115,7 @@ This is the core of logical design: systematic rules for converting every ER con
 **Example: Category**
 
 ER:
+
 ```
 Category
   - category_id (PK)
@@ -121,6 +124,7 @@ Category
 ```
 
 SQL:
+
 ```sql
 CREATE TABLE categories (
     category_id   INTEGER      PRIMARY KEY,
@@ -132,6 +136,7 @@ CREATE TABLE categories (
 **Example: Customer**
 
 ER:
+
 ```
 Customer
   - customer_id (PK)
@@ -144,6 +149,7 @@ Customer
 ```
 
 SQL:
+
 ```sql
 CREATE TABLE customers (
     customer_id   INTEGER       PRIMARY KEY,
@@ -182,6 +188,7 @@ CREATE TABLE orders (
 **Why on the "many" side?** Because each order belongs to ONE customer — you can store that single reference in the order row. If you tried to store it on the Customer side, you'd need to store multiple order IDs per customer row, violating atomicity.
 
 **Participation and NULLability:**
+
 - Mandatory participation (every order MUST have a customer) → `NOT NULL` on the FK column
 - Optional participation (an order MAY have no customer) → allow NULL on the FK column
 
@@ -218,11 +225,13 @@ CREATE TABLE order_items (
 **Composite PK vs Surrogate PK:**
 
 Option A — Composite primary key (shown above):
+
 - `PRIMARY KEY (order_id, product_id)`
 - Pros: natural, no extra column, prevents duplicate product lines per order
 - Cons: composite keys are slightly more complex in JOIN queries
 
 Option B — Surrogate primary key:
+
 ```sql
 CREATE TABLE order_items (
     order_item_id SERIAL       PRIMARY KEY,
@@ -233,6 +242,7 @@ CREATE TABLE order_items (
     UNIQUE (order_id, product_id)
 );
 ```
+
 - Pros: simpler references from other tables, single-column PK
 - Cons: extra column, must add UNIQUE constraint separately
 
@@ -243,6 +253,7 @@ For TrailShop we'll use the composite key approach for both `product_categories`
 **Rule:** Add a foreign key to one of the two tables. But which one?
 
 Decision criteria:
+
 - **If one side has mandatory participation and the other optional:** Put the FK on the mandatory side (it will always have a value).
 - **If both sides are mandatory:** Either side works; choose the side that makes queries more natural.
 - **If both sides are optional:** Put the FK on the side that is more likely to have the value. Mark the FK column as NULL-able.
@@ -280,6 +291,7 @@ CREATE TABLE order_items (
 ```
 
 Key aspects:
+
 - `order_id` is both a FK to `orders` and part of the composite PK
 - `ON DELETE CASCADE` — if an order is deleted, its items are automatically deleted (because the weak entity can't exist without its owner)
 - The FK to `orders` is `NOT NULL` — mandatory participation
@@ -293,6 +305,7 @@ Key aspects:
 ER: Product has multivalued attribute `tags`
 
 SQL:
+
 ```sql
 CREATE TABLE product_tags (
     product_id INTEGER     NOT NULL REFERENCES products(product_id)
@@ -323,6 +336,7 @@ CREATE TABLE customer_phones (
 We already saw this with the address attribute in Section 3.1. Here's the general pattern:
 
 ER:
+
 ```
 full_name (composite)
 ├── first_name
@@ -332,6 +346,7 @@ full_name (composite)
 SQL: Two columns: `first_name VARCHAR(50)`, `last_name VARCHAR(50)`
 
 ER:
+
 ```
 address (composite)
 ├── street
@@ -346,19 +361,19 @@ SQL: Four columns: `street`, `city`, `postal_code`, `country`
 
 ### 3.8 Transformation Rules Summary
 
-| ER Construct | Relational Mapping |
-|---|---|
-| Strong entity | Table with own PK |
-| Weak entity | Table with composite PK (includes owner's PK as FK) |
-| 1:N relationship | FK on the "many" side |
-| M:N relationship | Junction table with FKs to both sides |
-| 1:1 relationship | FK on one side (with UNIQUE constraint) |
-| Multivalued attribute | Separate table with FK |
-| Composite attribute | Decompose into individual columns |
-| Derived attribute | Compute in queries; don't store |
-| Key attribute | PRIMARY KEY |
-| Optional participation | FK column allows NULL |
-| Mandatory participation | FK column is NOT NULL |
+| ER Construct            | Relational Mapping                                  |
+| ----------------------- | --------------------------------------------------- |
+| Strong entity           | Table with own PK                                   |
+| Weak entity             | Table with composite PK (includes owner's PK as FK) |
+| 1:N relationship        | FK on the "many" side                               |
+| M:N relationship        | Junction table with FKs to both sides               |
+| 1:1 relationship        | FK on one side (with UNIQUE constraint)             |
+| Multivalued attribute   | Separate table with FK                              |
+| Composite attribute     | Decompose into individual columns                   |
+| Derived attribute       | Compute in queries; don't store                     |
+| Key attribute           | PRIMARY KEY                                         |
+| Optional participation  | FK column allows NULL                               |
+| Mandatory participation | FK column is NOT NULL                               |
 
 ---
 
@@ -370,24 +385,26 @@ PostgreSQL documentation: https://www.postgresql.org/docs/current/datatype.html
 
 ### 4.1 Numeric Types
 
-| Type | Size | Range | Use When |
-|---|---|---|---|
-| `SMALLINT` | 2 bytes | -32,768 to 32,767 | Small counters, ages, quantities under ~30K |
-| `INTEGER` | 4 bytes | -2,147,483,648 to 2,147,483,647 | Most IDs, counts, general integers |
-| `BIGINT` | 8 bytes | ±9.2 × 10¹⁸ | Very large counters, timestamps-as-integers |
-| `NUMERIC(p,s)` | variable | up to 131,072 digits before decimal, 16,383 after | Exact precision: money, measurements |
-| `REAL` | 4 bytes | ~6 decimal digits precision | Scientific data where slight imprecision is OK |
-| `DOUBLE PRECISION` | 8 bytes | ~15 decimal digits precision | Scientific data, coordinates |
-| `SERIAL` | 4 bytes | 1 to 2,147,483,647 | Auto-incrementing integer PK |
-| `BIGSERIAL` | 8 bytes | 1 to 9.2 × 10¹⁸ | Auto-incrementing PK for huge tables |
-| `SMALLSERIAL` | 2 bytes | 1 to 32,767 | Auto-incrementing PK for small lookup tables |
+| Type                 | Size     | Range                                             | Use When                                       |
+| -------------------- | -------- | ------------------------------------------------- | ---------------------------------------------- |
+| `SMALLINT`         | 2 bytes  | -32,768 to 32,767                                 | Small counters, ages, quantities under ~30K    |
+| `INTEGER`          | 4 bytes  | -2,147,483,648 to 2,147,483,647                   | Most IDs, counts, general integers             |
+| `BIGINT`           | 8 bytes  | ±9.2 × 10¹⁸                                   | Very large counters, timestamps-as-integers    |
+| `NUMERIC(p,s)`     | variable | up to 131,072 digits before decimal, 16,383 after | Exact precision: money, measurements           |
+| `REAL`             | 4 bytes  | ~6 decimal digits precision                       | Scientific data where slight imprecision is OK |
+| `DOUBLE PRECISION` | 8 bytes  | ~15 decimal digits precision                      | Scientific data, coordinates                   |
+| `SERIAL`           | 4 bytes  | 1 to 2,147,483,647                                | Auto-incrementing integer PK                   |
+| `BIGSERIAL`        | 8 bytes  | 1 to 9.2 × 10¹⁸                                | Auto-incrementing PK for huge tables           |
+| `SMALLSERIAL`      | 2 bytes  | 1 to 32,767                                       | Auto-incrementing PK for small lookup tables   |
 
 **For TrailShop:**
+
 - `product_id`, `category_id`, `customer_id`, `order_id` → `INTEGER` or `SERIAL`
 - `price`, `unit_price` → `NUMERIC(10,2)` (exact decimal, never use REAL/FLOAT for money!)
 - `stock_quantity`, `quantity` → `INTEGER`
 
 **Why never REAL or DOUBLE PRECISION for money?**
+
 ```sql
 SELECT 0.1::REAL + 0.2::REAL;
 -- Result: 0.30000001192092896 (not exactly 0.3!)
@@ -398,15 +415,16 @@ SELECT 0.1::NUMERIC + 0.2::NUMERIC;
 
 ### 4.2 Character Types
 
-| Type | Description | Use When |
-|---|---|---|
-| `VARCHAR(n)` | Variable-length with limit | Names, emails, most text with a natural upper bound |
-| `CHAR(n)` | Fixed-length, padded with spaces | Fixed codes (ISO country: `CHAR(2)`, currency: `CHAR(3)`) |
-| `TEXT` | Variable-length, unlimited | Descriptions, comments, long text with no practical limit |
+| Type           | Description                      | Use When                                                      |
+| -------------- | -------------------------------- | ------------------------------------------------------------- |
+| `VARCHAR(n)` | Variable-length with limit       | Names, emails, most text with a natural upper bound           |
+| `CHAR(n)`    | Fixed-length, padded with spaces | Fixed codes (ISO country: `CHAR(2)`, currency: `CHAR(3)`) |
+| `TEXT`       | Variable-length, unlimited       | Descriptions, comments, long text with no practical limit     |
 
 In PostgreSQL, `VARCHAR` without a length limit and `TEXT` are functionally identical in performance. The difference is only in validation — `VARCHAR(100)` rejects values longer than 100 characters.
 
 **For TrailShop:**
+
 - `name` → `VARCHAR(100)`
 - `email` → `VARCHAR(100)`
 - `description` → `TEXT`
@@ -415,17 +433,18 @@ In PostgreSQL, `VARCHAR` without a length limit and `TEXT` are functionally iden
 
 ### 4.3 Date and Time Types
 
-| Type | Size | Description | Example |
-|---|---|---|---|
-| `DATE` | 4 bytes | Date only (no time) | `'2026-09-15'` |
-| `TIME` | 8 bytes | Time only (no date) | `'14:30:00'` |
-| `TIMESTAMP` | 8 bytes | Date + time, no timezone | `'2026-09-15 14:30:00'` |
-| `TIMESTAMPTZ` | 8 bytes | Date + time with timezone | `'2026-09-15 14:30:00+03'` |
-| `INTERVAL` | 16 bytes | Duration / time span | `'2 hours 30 minutes'`, `'1 year 3 months'` |
+| Type            | Size     | Description               | Example                                         |
+| --------------- | -------- | ------------------------- | ----------------------------------------------- |
+| `DATE`        | 4 bytes  | Date only (no time)       | `'2026-09-15'`                                |
+| `TIME`        | 8 bytes  | Time only (no date)       | `'14:30:00'`                                  |
+| `TIMESTAMP`   | 8 bytes  | Date + time, no timezone  | `'2026-09-15 14:30:00'`                       |
+| `TIMESTAMPTZ` | 8 bytes  | Date + time with timezone | `'2026-09-15 14:30:00+03'`                    |
+| `INTERVAL`    | 16 bytes | Duration / time span      | `'2 hours 30 minutes'`, `'1 year 3 months'` |
 
 **Best practice:** Almost always use `TIMESTAMPTZ` (timestamp with time zone) instead of `TIMESTAMP`. PostgreSQL stores `TIMESTAMPTZ` in UTC internally and converts to the session timezone on display. This avoids timezone bugs when users are in different zones.
 
 **Interval examples:**
+
 ```sql
 SELECT NOW() + INTERVAL '30 days';          -- 30 days from now
 SELECT age('2026-09-15', '2000-03-21');     -- returns interval '26 years 5 months 25 days'
@@ -433,14 +452,15 @@ SELECT INTERVAL '2 hours' + INTERVAL '45 minutes';  -- '02:45:00'
 ```
 
 **For TrailShop:**
+
 - `order_date` → `TIMESTAMPTZ`
 - `registered_at` → `TIMESTAMPTZ`
 - `created_at` → `TIMESTAMPTZ`
 
 ### 4.4 Boolean Type
 
-| Type | Size | Values |
-|---|---|---|
+| Type        | Size   | Values                        |
+| ----------- | ------ | ----------------------------- |
 | `BOOLEAN` | 1 byte | `TRUE`, `FALSE`, `NULL` |
 
 Accepted literals: `TRUE`/`FALSE`, `'t'`/`'f'`, `'yes'`/`'no'`, `'on'`/`'off'`, `1`/`0`.
@@ -451,8 +471,8 @@ ALTER TABLE products ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT TRUE;
 
 ### 4.5 UUID Type
 
-| Type | Size | Description |
-|---|---|---|
+| Type     | Size     | Description                             |
+| -------- | -------- | --------------------------------------- |
 | `UUID` | 16 bytes | Universally unique identifier (128-bit) |
 
 ```sql
@@ -464,6 +484,7 @@ CREATE TABLE example (
 ```
 
 UUIDs are useful when:
+
 - You need globally unique IDs across systems (distributed databases, APIs)
 - You don't want sequential IDs to reveal business information (how many customers you have)
 
@@ -484,6 +505,7 @@ Pros: type-safe, self-documenting, compact storage
 Cons: adding new values requires `ALTER TYPE`, harder to manage in migrations
 
 **Alternative:** Use `VARCHAR` with a `CHECK` constraint for flexibility:
+
 ```sql
 status VARCHAR(20) NOT NULL DEFAULT 'pending'
        CHECK (status IN ('pending', 'processing', 'shipped', 'delivered', 'cancelled'))
@@ -510,11 +532,11 @@ Arrays are useful for simple lists that don't need their own table. But if you n
 
 ### 4.8 Network Address Types
 
-| Type | Size | Description |
-|---|---|---|
-| `CIDR` | 7 or 19 bytes | IPv4 or IPv6 network address |
-| `INET` | 7 or 19 bytes | IPv4 or IPv6 host address (with optional subnet) |
-| `MACADDR` | 6 bytes | MAC address |
+| Type        | Size          | Description                                      |
+| ----------- | ------------- | ------------------------------------------------ |
+| `CIDR`    | 7 or 19 bytes | IPv4 or IPv6 network address                     |
+| `INET`    | 7 or 19 bytes | IPv4 or IPv6 host address (with optional subnet) |
+| `MACADDR` | 6 bytes       | MAC address                                      |
 
 ```sql
 CREATE TABLE login_log (
@@ -529,9 +551,9 @@ These types validate the format and support network-specific operations (contain
 
 ### 4.9 JSON Types
 
-| Type | Description |
-|---|---|
-| `JSON` | Stores JSON text (validated on input, stored as text) |
+| Type      | Description                                                      |
+| --------- | ---------------------------------------------------------------- |
+| `JSON`  | Stores JSON text (validated on input, stored as text)            |
 | `JSONB` | Stores JSON in binary format (faster queries, supports indexing) |
 
 ```sql
@@ -550,22 +572,22 @@ Use `JSONB` for semi-structured data that doesn't fit neatly into columns. But d
 
 ### 4.10 Data Type Quick-Reference for Common Scenarios
 
-| What You're Storing | Recommended Type | Why |
-|---|---|---|
-| Auto-incrementing ID | `SERIAL` or `INTEGER` + sequence | Simple, compact |
-| Money / prices | `NUMERIC(10,2)` | Exact decimal |
-| Short text (names, codes) | `VARCHAR(n)` | Length limit prevents garbage |
-| Long text (descriptions) | `TEXT` | No artificial limit |
-| Dates without time | `DATE` | Smaller than timestamp |
-| Timestamps | `TIMESTAMPTZ` | Timezone-aware |
-| Yes/no flags | `BOOLEAN` | Self-documenting |
-| Percentages | `NUMERIC(5,2)` | 0.00 to 100.00 |
-| Email | `VARCHAR(254)` | RFC 5321 max length is 254 |
-| Phone number | `VARCHAR(20)` | Phones have +, spaces, dashes — never use INTEGER |
-| Postal code | `VARCHAR(10)` | Leading zeros matter (e.g., "01234") |
-| Weight, dimensions | `NUMERIC(8,2)` | Exact decimal |
-| IP address | `INET` | Built-in validation |
-| Flexible key-value data | `JSONB` | Queryable semi-structured data |
+| What You're Storing       | Recommended Type                     | Why                                                |
+| ------------------------- | ------------------------------------ | -------------------------------------------------- |
+| Auto-incrementing ID      | `SERIAL` or `INTEGER` + sequence | Simple, compact                                    |
+| Money / prices            | `NUMERIC(10,2)`                    | Exact decimal                                      |
+| Short text (names, codes) | `VARCHAR(n)`                       | Length limit prevents garbage                      |
+| Long text (descriptions)  | `TEXT`                             | No artificial limit                                |
+| Dates without time        | `DATE`                             | Smaller than timestamp                             |
+| Timestamps                | `TIMESTAMPTZ`                      | Timezone-aware                                     |
+| Yes/no flags              | `BOOLEAN`                          | Self-documenting                                   |
+| Percentages               | `NUMERIC(5,2)`                     | 0.00 to 100.00                                     |
+| Email                     | `VARCHAR(254)`                     | RFC 5321 max length is 254                         |
+| Phone number              | `VARCHAR(20)`                      | Phones have +, spaces, dashes — never use INTEGER |
+| Postal code               | `VARCHAR(10)`                      | Leading zeros matter (e.g., "01234")               |
+| Weight, dimensions        | `NUMERIC(8,2)`                     | Exact decimal                                      |
+| IP address                | `INET`                             | Built-in validation                                |
+| Flexible key-value data   | `JSONB`                            | Queryable semi-structured data                     |
 
 ---
 
@@ -602,6 +624,7 @@ CREATE TABLE customers (
 ```
 
 A `UNIQUE` constraint can span multiple columns:
+
 ```sql
 CREATE TABLE product_tags (
     product_id INTEGER NOT NULL,
@@ -622,6 +645,7 @@ CREATE TABLE categories (
 ```
 
 Composite primary key:
+
 ```sql
 CREATE TABLE order_items (
     order_id   INTEGER NOT NULL REFERENCES orders(order_id),
@@ -635,6 +659,7 @@ CREATE TABLE order_items (
 Links a column to the primary key (or unique column) of another table. Enforces referential integrity.
 
 **Inline syntax:**
+
 ```sql
 CREATE TABLE orders (
     order_id    INTEGER PRIMARY KEY,
@@ -643,6 +668,7 @@ CREATE TABLE orders (
 ```
 
 **Table-level syntax (required for composite FKs):**
+
 ```sql
 CREATE TABLE order_items (
     order_id   INTEGER NOT NULL,
@@ -666,6 +692,7 @@ CREATE TABLE products (
 ```
 
 Multi-column CHECK:
+
 ```sql
 CREATE TABLE events (
     event_id   INTEGER PRIMARY KEY,
@@ -676,6 +703,7 @@ CREATE TABLE events (
 ```
 
 Named CHECK constraint (useful for error messages):
+
 ```sql
 CONSTRAINT positive_price CHECK (price > 0)
 ```
@@ -717,15 +745,15 @@ This prevents double-booking a room — no two bookings for the same room can ha
 
 ### 5.8 Constraints Summary Table
 
-| Constraint | Purpose | Syntax Example |
-|---|---|---|
-| `NOT NULL` | Prevent missing values | `name VARCHAR(50) NOT NULL` |
-| `UNIQUE` | Prevent duplicate values | `email VARCHAR(100) UNIQUE` |
-| `PRIMARY KEY` | Unique row identifier (NOT NULL + UNIQUE) | `id INTEGER PRIMARY KEY` |
-| `FOREIGN KEY` | Referential integrity | `REFERENCES other_table(pk_col)` |
-| `CHECK` | Custom boolean condition | `CHECK (price > 0)` |
-| `DEFAULT` | Auto-fill missing values | `DEFAULT NOW()` |
-| `EXCLUDE` | Prevent overlapping/conflicting values | `EXCLUDE USING gist (...)` |
+| Constraint      | Purpose                                   | Syntax Example                     |
+| --------------- | ----------------------------------------- | ---------------------------------- |
+| `NOT NULL`    | Prevent missing values                    | `name VARCHAR(50) NOT NULL`      |
+| `UNIQUE`      | Prevent duplicate values                  | `email VARCHAR(100) UNIQUE`      |
+| `PRIMARY KEY` | Unique row identifier (NOT NULL + UNIQUE) | `id INTEGER PRIMARY KEY`         |
+| `FOREIGN KEY` | Referential integrity                     | `REFERENCES other_table(pk_col)` |
+| `CHECK`       | Custom boolean condition                  | `CHECK (price > 0)`              |
+| `DEFAULT`     | Auto-fill missing values                  | `DEFAULT NOW()`                  |
+| `EXCLUDE`     | Prevent overlapping/conflicting values    | `EXCLUDE USING gist (...)`       |
 
 ---
 
@@ -735,13 +763,13 @@ When a referenced row is updated or deleted, what should happen to the rows that
 
 ### 6.1 The Five Actions
 
-| Action | On DELETE behavior | On UPDATE behavior |
-|---|---|---|
-| `NO ACTION` (default) | Raise error if any child rows exist | Raise error if any child rows reference old value |
-| `RESTRICT` | Same as NO ACTION but checked immediately (not deferrable) | Same |
-| `CASCADE` | Delete all child rows automatically | Update FK values in child rows automatically |
-| `SET NULL` | Set FK column(s) to NULL | Set FK column(s) to NULL |
-| `SET DEFAULT` | Set FK column(s) to their DEFAULT value | Set FK column(s) to their DEFAULT value |
+| Action                  | On DELETE behavior                                         | On UPDATE behavior                                |
+| ----------------------- | ---------------------------------------------------------- | ------------------------------------------------- |
+| `NO ACTION` (default) | Raise error if any child rows exist                        | Raise error if any child rows reference old value |
+| `RESTRICT`            | Same as NO ACTION but checked immediately (not deferrable) | Same                                              |
+| `CASCADE`             | Delete all child rows automatically                        | Update FK values in child rows automatically      |
+| `SET NULL`            | Set FK column(s) to NULL                                   | Set FK column(s) to NULL                          |
+| `SET DEFAULT`         | Set FK column(s) to their DEFAULT value                    | Set FK column(s) to their DEFAULT value           |
 
 ### 6.2 Syntax
 
@@ -761,18 +789,22 @@ CREATE TABLE order_items (
 ### 6.3 When to Use Each — Decision Guide
 
 **CASCADE** — Use when child rows are meaningless without the parent.
+
 - Delete an order → delete its order items (they're part of the order)
 - Delete a customer → delete their orders? Maybe, maybe not. Consider soft-delete instead.
 
 **RESTRICT / NO ACTION** — Use when deletion should be blocked if children exist.
+
 - Delete a customer → should fail if they have orders (order history matters)
 - Delete a product → should fail if it appears in existing order items (historical data matters)
 
 **SET NULL** — Use when the child should survive but lose its link.
+
 - Delete a manager (employee) → set `manager_id` to NULL for their reports (they now have no manager)
 - The FK column must allow NULL for this to work
 
 **SET DEFAULT** — Use when a sensible default exists.
+
 - Delete a category → set products to a "General" category (whose ID is the default)
 - Rarely used in practice
 
@@ -800,13 +832,13 @@ Parent row is being deleted. What happens to child rows?
 
 ### 6.5 TrailShop FK Actions
 
-| FK Relationship | ON DELETE | ON UPDATE | Reasoning |
-|---|---|---|---|
-| `product_categories.product_id` → `products` | CASCADE | CASCADE | Link rows are meaningless without the product |
-| `product_categories.category_id` → `categories` | CASCADE | CASCADE | Link rows are meaningless without the category; products themselves survive |
-| `orders.customer_id` → `customers` | RESTRICT | CASCADE | Don't delete a customer with orders (consider soft-delete) |
-| `order_items.order_id` → `orders` | CASCADE | CASCADE | Order items are part of the order |
-| `order_items.product_id` → `products` | RESTRICT | CASCADE | Don't delete a product that appears in order history |
+| FK Relationship                                      | ON DELETE | ON UPDATE | Reasoning                                                                   |
+| ---------------------------------------------------- | --------- | --------- | --------------------------------------------------------------------------- |
+| `product_categories.product_id` → `products`    | CASCADE   | CASCADE   | Link rows are meaningless without the product                               |
+| `product_categories.category_id` → `categories` | CASCADE   | CASCADE   | Link rows are meaningless without the category; products themselves survive |
+| `orders.customer_id` → `customers`              | RESTRICT  | CASCADE   | Don't delete a customer with orders (consider soft-delete)                  |
+| `order_items.order_id` → `orders`               | CASCADE   | CASCADE   | Order items are part of the order                                           |
+| `order_items.product_id` → `products`           | RESTRICT  | CASCADE   | Don't delete a product that appears in order history                        |
 
 ---
 
@@ -820,10 +852,10 @@ You cannot insert certain data without inserting other unrelated data.
 
 **Example:** If products and categories are stored in a single table:
 
-| product_id | name | price | category_name | category_description |
-|---|---|---|---|---|
-| 101 | Alpine Pro Hiking Boots | 189.50 | Footwear | Shoes and boots |
-| 102 | TrailMaster X4 Tent | 249.99 | Camping | Tents and sleeping gear |
+| product_id | name                    | price  | category_name | category_description    |
+| ---------- | ----------------------- | ------ | ------------- | ----------------------- |
+| 101        | Alpine Pro Hiking Boots | 189.50 | Footwear      | Shoes and boots         |
+| 102        | TrailMaster X4 Tent     | 249.99 | Camping       | Tents and sleeping gear |
 
 Problem: You can't add a new category ("Cycling") without also adding a product. The category data requires a product row to exist.
 
@@ -851,16 +883,16 @@ Consistent naming makes your schema readable, maintainable, and less error-prone
 
 ### 8.1 General Rules
 
-| Rule | Convention | Example |
-|---|---|---|
-| Case | `snake_case` for everything | `order_items`, `first_name` |
-| Table names | Plural nouns | `products`, `customers`, `order_items` |
-| Column names | Singular descriptive | `first_name`, `order_date`, `unit_price` |
-| Primary keys | `<singular_table_name>_id` | `product_id`, `customer_id` |
-| Foreign keys | Same name as the PK they reference | `product_categories.category_id` → `categories.category_id` |
-| Boolean columns | Prefix with `is_`, `has_`, `can_` | `is_active`, `has_shipped` |
-| Timestamps | Suffix with `_at` or `_on` | `created_at`, `shipped_on` |
-| Constraints | `<table>_<column(s)>_<type>` | `products_price_check`, `customers_email_key` |
+| Rule            | Convention                              | Example                                                          |
+| --------------- | --------------------------------------- | ---------------------------------------------------------------- |
+| Case            | `snake_case` for everything           | `order_items`, `first_name`                                  |
+| Table names     | Plural nouns                            | `products`, `customers`, `order_items`                     |
+| Column names    | Singular descriptive                    | `first_name`, `order_date`, `unit_price`                   |
+| Primary keys    | `<singular_table_name>_id`            | `product_id`, `customer_id`                                  |
+| Foreign keys    | Same name as the PK they reference      | `product_categories.category_id` → `categories.category_id` |
+| Boolean columns | Prefix with `is_`, `has_`, `can_` | `is_active`, `has_shipped`                                   |
+| Timestamps      | Suffix with `_at` or `_on`          | `created_at`, `shipped_on`                                   |
+| Constraints     | `<table>_<column(s)>_<type>`          | `products_price_check`, `customers_email_key`                |
 
 ### 8.2 Why snake_case?
 
@@ -871,6 +903,7 @@ PostgreSQL folds unquoted identifiers to lowercase. If you write `CREATE TABLE O
 ### 8.3 Singular vs Plural Table Names
 
 This is a debate in the database community. We use **plural** because:
+
 - A table contains *many* rows: the `customers` table holds many customers
 - SQL reads naturally: `SELECT * FROM customers` ("select from the customers table")
 - PostgreSQL system catalogs use plural (e.g., `pg_tables`, `pg_indexes`)
@@ -881,14 +914,14 @@ Some teams prefer singular. The most important thing is **consistency** — pick
 
 Avoid using PostgreSQL reserved words as identifiers. Common traps:
 
-| Tempting Name | Problem | Better Alternative |
-|---|---|---|
-| `user` | Reserved word | `app_user`, `customer` |
-| `order` | Reserved word | `orders` (plural avoids it) |
-| `name` | Not reserved, but very generic | `product_name`, `category_name` |
-| `date` | Not reserved, but generic | `order_date`, `created_at` |
-| `type` | Not reserved, but generic | `product_type`, `account_type` |
-| `status` | Not reserved, but generic | `order_status` (or just `status` if unambiguous) |
+| Tempting Name | Problem                        | Better Alternative                                   |
+| ------------- | ------------------------------ | ---------------------------------------------------- |
+| `user`      | Reserved word                  | `app_user`, `customer`                           |
+| `order`     | Reserved word                  | `orders` (plural avoids it)                        |
+| `name`      | Not reserved, but very generic | `product_name`, `category_name`                  |
+| `date`      | Not reserved, but generic      | `order_date`, `created_at`                       |
+| `type`      | Not reserved, but generic      | `product_type`, `account_type`                   |
+| `status`    | Not reserved, but generic      | `order_status` (or just `status` if unambiguous) |
 
 Full list: https://www.postgresql.org/docs/current/sql-keywords-appendix.html
 
@@ -899,37 +932,41 @@ Full list: https://www.postgresql.org/docs/current/sql-keywords-appendix.html
 ### 9.1 Definitions
 
 **Natural Key:** A column (or columns) that has real-world meaning and naturally identifies each row.
+
 - Email address for a customer
 - ISBN for a book
 - Social security number for a person
 - Country code (ISO 3166) for a country
 
 **Surrogate Key:** An artificial, system-generated value with no business meaning.
+
 - Auto-incrementing integer (`SERIAL`)
 - UUID (`gen_random_uuid()`)
 
 ### 9.2 Comparison
 
-| Aspect | Natural Key | Surrogate Key |
-|---|---|---|
-| **Meaning** | Has business meaning | No business meaning |
-| **Stability** | May change (email, name) | Never changes |
-| **Size** | Variable (VARCHAR, composite) | Fixed (INTEGER = 4 bytes) |
-| **JOIN performance** | Slower with wide keys | Faster with INTEGER |
-| **Exposure** | Can reveal business data | Sequential integers reveal count |
-| **External references** | Already used by the real world | Must be communicated separately |
-| **Availability** | May not exist for all entities | Always available |
-| **Uniqueness guarantee** | Depends on the real world | Guaranteed by the DBMS |
+| Aspect                         | Natural Key                    | Surrogate Key                    |
+| ------------------------------ | ------------------------------ | -------------------------------- |
+| **Meaning**              | Has business meaning           | No business meaning              |
+| **Stability**            | May change (email, name)       | Never changes                    |
+| **Size**                 | Variable (VARCHAR, composite)  | Fixed (INTEGER = 4 bytes)        |
+| **JOIN performance**     | Slower with wide keys          | Faster with INTEGER              |
+| **Exposure**             | Can reveal business data       | Sequential integers reveal count |
+| **External references**  | Already used by the real world | Must be communicated separately  |
+| **Availability**         | May not exist for all entities | Always available                 |
+| **Uniqueness guarantee** | Depends on the real world      | Guaranteed by the DBMS           |
 
 ### 9.3 When to Use Which
 
 **Use surrogate keys when:**
+
 - There's no obvious natural key
 - The natural key is long, composite, or might change
 - You need consistent JOIN performance
 - You're building an API (expose surrogates, not business data)
 
 **Use natural keys when:**
+
 - The natural key is short, stable, and universally recognized (ISO codes, currency codes)
 - You're building a lookup/reference table
 
@@ -1018,7 +1055,8 @@ CREATE TABLE product_categories (
     product_id  INTEGER NOT NULL
                 REFERENCES products(product_id)
                 ON DELETE CASCADE
-                ON UPDATE CASCADE,
+                ON UP
+  DATE CASCADE,
     category_id INTEGER NOT NULL
                 REFERENCES categories(category_id)
                 ON DELETE CASCADE
@@ -1135,35 +1173,36 @@ order_items
 
 ## Key Terms
 
-| Term | Definition |
-|---|---|
-| **Database development lifecycle** | The phases from requirements through implementation and maintenance |
-| **Logical design** | Transforming a conceptual model into a relational schema with types and constraints |
-| **Transformation rule** | A systematic rule for converting an ER construct into relational tables |
-| **Junction table** | A table that resolves an M:N relationship, containing FKs to both participating tables |
-| **Data type** | The kind of values a column can hold (INTEGER, VARCHAR, NUMERIC, etc.) |
-| **SERIAL** | An auto-incrementing integer type in PostgreSQL |
-| **NUMERIC(p,s)** | Exact decimal type with p total digits and s decimal places |
-| **TIMESTAMPTZ** | Timestamp with time zone — stores in UTC, displays in session timezone |
-| **NOT NULL** | Constraint preventing NULL values in a column |
-| **UNIQUE** | Constraint preventing duplicate values |
-| **PRIMARY KEY** | NOT NULL + UNIQUE; identifies each row |
-| **FOREIGN KEY** | Constraint linking a column to a PK/UNIQUE in another table |
-| **CHECK** | Constraint enforcing a custom condition |
-| **DEFAULT** | A value assigned when no value is specified on INSERT |
-| **CASCADE** | FK action: automatically delete/update child rows |
-| **RESTRICT** | FK action: block delete/update if child rows exist |
-| **SET NULL** | FK action: set FK to NULL when parent is deleted |
-| **Design anomaly** | A problem (insertion, update, deletion) caused by poor schema design |
-| **Surrogate key** | An artificial, system-generated key with no business meaning |
-| **Natural key** | A key with real-world meaning (email, ISBN, SSN) |
-| **snake_case** | Naming convention using lowercase and underscores |
+| Term                                     | Definition                                                                             |
+| ---------------------------------------- | -------------------------------------------------------------------------------------- |
+| **Database development lifecycle** | The phases from requirements through implementation and maintenance                    |
+| **Logical design**                 | Transforming a conceptual model into a relational schema with types and constraints    |
+| **Transformation rule**            | A systematic rule for converting an ER construct into relational tables                |
+| **Junction table**                 | A table that resolves an M:N relationship, containing FKs to both participating tables |
+| **Data type**                      | The kind of values a column can hold (INTEGER, VARCHAR, NUMERIC, etc.)                 |
+| **SERIAL**                         | An auto-incrementing integer type in PostgreSQL                                        |
+| **NUMERIC(p,s)**                   | Exact decimal type with p total digits and s decimal places                            |
+| **TIMESTAMPTZ**                    | Timestamp with time zone — stores in UTC, displays in session timezone                |
+| **NOT NULL**                       | Constraint preventing NULL values in a column                                          |
+| **UNIQUE**                         | Constraint preventing duplicate values                                                 |
+| **PRIMARY KEY**                    | NOT NULL + UNIQUE; identifies each row                                                 |
+| **FOREIGN KEY**                    | Constraint linking a column to a PK/UNIQUE in another table                            |
+| **CHECK**                          | Constraint enforcing a custom condition                                                |
+| **DEFAULT**                        | A value assigned when no value is specified on INSERT                                  |
+| **CASCADE**                        | FK action: automatically delete/update child rows                                      |
+| **RESTRICT**                       | FK action: block delete/update if child rows exist                                     |
+| **SET NULL**                       | FK action: set FK to NULL when parent is deleted                                       |
+| **Design anomaly**                 | A problem (insertion, update, deletion) caused by poor schema design                   |
+| **Surrogate key**                  | An artificial, system-generated key with no business meaning                           |
+| **Natural key**                    | A key with real-world meaning (email, ISBN, SSN)                                       |
+| **snake_case**                     | Naming convention using lowercase and underscores                                      |
 
 ---
 
 ## Reading Assignments
 
 **Required:**
+
 - *Database Design*, 2nd Edition — Chapters 10 (ER Modelling to Relational Mapping), 13 (Database Development Process), and 15 (SQL DDL)
 - PostgreSQL Docs: Data Types — https://www.postgresql.org/docs/current/datatype.html
 - PostgreSQL Docs: Constraints — https://www.postgresql.org/docs/current/ddl-constraints.html

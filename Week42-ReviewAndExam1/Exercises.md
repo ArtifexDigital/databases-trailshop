@@ -1,3 +1,4 @@
+
 # Week 42 — Exercises: Review and Exam 1 Preparation (Optional)
 
 > [!IMPORTANT]
@@ -69,66 +70,53 @@ Draw or describe the ER diagram for PetStore:
 Write the CREATE TABLE statements:
 
 ```sql
-CREATE TABLE pet_categories (
-    category_id   SERIAL PRIMARY KEY,
-    name          VARCHAR(100) NOT NULL UNIQUE
+CREATE TABLE pet_categories(
+  category_id PRIMARY_KEY,
+  name VARCHAR(100) NOT NULL UNIQUE  
+); 
+
+CREATE TABLE pet_products(
+  product_id PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  description TEXT,
+  price NUMERIC(10,2) NOT NULL CHECK(price > 0),
+  stock_quantity INTEGER NOT NULL DEFAULT 0 CHECK (stock_quantity >= 0),
+  category_id INTEGER NOT NULL REFERENCES pet_categories(category_id)
 );
 
-CREATE TABLE pet_products (
-    product_id    SERIAL PRIMARY KEY,
-    name          VARCHAR(200) NOT NULL,
-    description   TEXT,
-    price         NUMERIC(8,2) NOT NULL CHECK (price > 0),
-    stock         INTEGER NOT NULL DEFAULT 0 CHECK (stock >= 0),
-    category_id   INTEGER NOT NULL REFERENCES pet_categories(category_id)
+CREATE TABLE pet_customers(
+  customer_id PRIMARY KEY,
+  first_name VARCHAR(50) NOT NULL,
+  last_name VARCHAR(50) NOT NULL,
+  email VARCHAR(100) UNIQUE NOT NULL,
+  phone VARCHAR(30) NOT NULL
 );
 
-CREATE TABLE pet_customers (
-    customer_id   SERIAL PRIMARY KEY,
-    first_name    VARCHAR(100) NOT NULL,
-    last_name     VARCHAR(100) NOT NULL,
-    email         VARCHAR(255) NOT NULL UNIQUE,
-    phone         VARCHAR(20)
-);
-
-CREATE TABLE pet_sales (
-    sale_id       SERIAL PRIMARY KEY,
-    customer_id   INTEGER NOT NULL REFERENCES pet_customers(customer_id),
-    product_id    INTEGER NOT NULL REFERENCES pet_products(product_id),
-    quantity      INTEGER NOT NULL CHECK (quantity > 0),
-    unit_price    NUMERIC(8,2) NOT NULL CHECK (unit_price > 0),
-    sale_date     TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE pet_sales(
+  sales_id PRIMARY KEY,
+  customer_id INTEGER NOT NULL REFERENCES pet_customers(customer_id),
+  product_id INTEGER NOT NULL REFERENCES pet_products(product_id),
+  unit_price NUMERIC(10,2) NOT NULL CHECK(unit_price > 0),
+  quantity INTEGER NOT NULL CHECK (quantity > 0),
+  sale_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
 ### 2.4 Sample Data
 
 ```sql
-INSERT INTO pet_categories (name) VALUES
-    ('Dog Food'), ('Cat Toys'), ('Fish Supplies'), ('Bird Cages'), ('Small Animal');
+INSERT INTO pet_categories (name) values
+('Dog Food'), ('Cat Toys'), ('Fish Supplies');
 
-INSERT INTO pet_products (name, price, stock, category_id) VALUES
-    ('Premium Kibble 10kg', 45.99, 30, 1),
-    ('Grain-Free Wet Food 12-pack', 29.99, 50, 1),
-    ('Laser Pointer', 12.99, 100, 2),
-    ('Feather Wand', 8.99, 75, 2),
-    ('Aquarium Filter 50L', 34.99, 20, 3),
-    ('Tropical Fish Flakes', 6.99, 200, 3),
-    ('Parakeet Cage Large', 89.99, 10, 4),
-    ('Hamster Wheel', 14.99, 40, 5);
+INSERT INTO pet_products (name, price, stock_quantity, category_id) values
+('Premium Kibble 10Kg', 45.99, 30, 1),
+('Grain-Free Wet Food 12-pack', 29.99, 50, 1);
 
-INSERT INTO pet_customers (first_name, last_name, email, phone) VALUES
-    ('Liisa', 'Koivisto', 'liisa.k@email.com', '040-1234567'),
-    ('Markus', 'Lehtinen', 'markus.l@email.com', NULL),
-    ('Tiina', 'Järvinen', 'tiina.j@email.com', '050-9876543');
+INSERT INTO pet_customers (first_name, last_name, email) values
+('Liisa', 'Koivisto', 'liisa.k@email.com', '040-1234567');
 
-INSERT INTO pet_sales (customer_id, product_id, quantity, unit_price) VALUES
-    (1, 1, 2, 45.99),
-    (1, 3, 1, 12.99),
-    (2, 5, 1, 34.99),
-    (2, 6, 3, 6.99),
-    (3, 4, 2, 8.99),
-    (1, 7, 1, 89.99);
+INSERT INTO pet_sales (customer_id, product_id, unit_price, quantity) VALUES 
+(1, 1, 45.99, 1)
 ```
 
 ### 2.5 Practice Queries with Solutions
@@ -141,20 +129,13 @@ Write SQL for each, then check against the solution.
 > **_Your SQL_**
 >
 > ```sql
-> -- Write your query here
->
->
+> SELECT pc.name AS category, pp.name AS product, pp.price
+> FROM pet_products pp
+> INNER JOIN pet_categories pc ON pp.name = pc.name
 > ```
 
 <details>
 <summary>Solution</summary>
-
-```sql
-SELECT pc.name AS category, pp.name AS product, pp.price
-FROM pet_products pp
-INNER JOIN pet_categories pc ON pp.category_id = pc.category_id
-ORDER BY pc.name, pp.price;
-```
 
 </details>
 
@@ -165,8 +146,6 @@ ORDER BY pc.name, pp.price;
 >
 > ```sql
 > -- Write your query here
->
->
 > ```
 
 <details>
@@ -190,8 +169,6 @@ ORDER BY total_spent DESC;
 >
 > ```sql
 > -- Write your query here
->
->
 > ```
 
 <details>
@@ -214,8 +191,6 @@ WHERE s.sale_id IS NULL;
 >
 > ```sql
 > -- Write your query here
->
->
 > ```
 
 <details>
@@ -240,8 +215,6 @@ ORDER BY revenue DESC;
 >
 > ```sql
 > -- Write your query here
->
->
 > ```
 
 <details>
@@ -311,9 +284,6 @@ For the library scenario above, write the CREATE TABLE statements (at least 3 ta
 > **_Your SQL_**
 >
 > ```sql
-> -- Write your query here
->
->
 > ```
 
 ### 3.6 (Week 40 — DDL)
@@ -324,9 +294,8 @@ Write an ALTER TABLE statement that adds a `discount_percent NUMERIC(4,2) CHECK 
 > **_Your SQL_**
 >
 > ```sql
-> -- Write your query here
->
->
+> ALTER TABLE products 
+> ADD COLUMN discount_percent NUMERIC(4,2) CHECK (discount_percent BETWEEN 0 AND 50);
 > ```
 
 ### 3.7 (Week 40 — DML)
@@ -337,9 +306,10 @@ Write an INSERT statement that adds 3 rows to a `books` table with columns: titl
 > **_Your SQL_**
 >
 > ```sql
-> -- Write your query here
->
->
+> INSERT INTO books (title, author, isbn, price) VALUES 
+> ('Title 1', 'Author 1', 12345, 10.99),
+> ('Title 2', 'Author 2', 12346, 11.99),
+> ('Title 3', 'Author 3', 12347, 12.99);
 > ```
 
 ### 3.8 (Week 41 — Querying)
@@ -358,7 +328,6 @@ HAVING COUNT(p.product_id) = 0;
 > [!NOTE]
 > **_Your Answer_**
 >
-> _(Write your answer here.)_
 
 ### 3.9 (Week 41 — Querying)
 
@@ -369,8 +338,6 @@ Write a query that finds the top 3 customers by total spending, showing their fu
 >
 > ```sql
 > -- Write your query here
->
->
 > ```
 
 ### 3.10 (Week 41 — Querying)
