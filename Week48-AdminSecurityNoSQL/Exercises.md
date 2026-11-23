@@ -1,8 +1,8 @@
 # Week 48 — Exercises: Database Administration, Security, and NoSQL
 
 > [!IMPORTANT]
-> ***How to Complete These Exercises***
-> Write your answers directly in the highlighted **Your Answer** / **Your SQL** fields below each task. Replace the placeholder text with your own work before submitting. This week includes the **last required TrailShop project work** — complete the weekly tasks and the final project submission at the end of this file.
+> **_How to Complete These Exercises_**
+> Write your answers directly in the highlighted **Your Answer** / **Your SQL** fields below each task. Replace the placeholder text with your own work before submitting. This week includes the **last required TrailShop project work**: Tasks 1–2, the theory review, and the final project submission at the end of this file. Other sections are marked recommended practice.
 
 These exercises let you practice the core topics from this week: managing access with roles and privileges, backing up and restoring databases, defending against SQL injection, and exploring NoSQL concepts — including PostgreSQL's own JSONB support. Work through them in order; the TrailShop project task builds on everything else.
 
@@ -15,7 +15,7 @@ These exercises let you practice the core topics from this week: managing access
 This task expands your TrailShop database with real-world administration and security work. You will create roles, test permissions, practice backup/restore, defend against injection, and prototype a new feature using both relational and document-style design.
 
 **Tables you are working with:**
-`products`, `customers`, `orders`, `order_items`, `categories`, `payments`
+`products`, `customers`, `orders`, `order_items`, `categories`, `product_categories`, `payments`
 
 ---
 
@@ -56,16 +56,10 @@ GRANT SELECT, INSERT, UPDATE ON customers TO ts_app;
 
 > Think about it: why does `ts_app` not get DELETE on any table? Why does `ts_warehouse` only get UPDATE on a single column?
 
-
-
 > [!NOTE]
-> ***Your Answer***
+> **_Your Answer_**
 >
-> *(Write your answer here.)*
->
->
->
->
+> With ts_app not getting DELETE we make sure, that no one from the web app can delete any tables, so no data gets lost. ts_warehouse only gets UPDATE on the stock_quantity column, because that is their main work, they dont need any other column, they only work with the stock_quantity.
 
 ---
 
@@ -121,20 +115,23 @@ DROP TABLE products;
 
 **Document your results:** For each query, record whether it succeeded or failed and what error message you received. Does every result match your expectations?
 
-
-
 > [!NOTE]
-> ***Your Answer***
+> **_Your Answer_**
 >
-> *(Write your answer here.)*
+> a) 1. succeed, 2. failed (no permission for products), 3. failed (no permission for products
 >
+> b) 1. succeed, 2. succeed, 3. failed (no permission for products), 4. failed (no permission for products)
 >
+> c) 1. failed (no permission for sequenz customers_customer_id_seq), 2. succed, 3. failed (no permission for payments), 4. failed (only for owners of products)
 >
->
+> Everything was expected except of the sequenz customers_customer_id_seq error.
 
 ---
 
-### Task 3 — Backup with pg_dump
+### Task 3 — Backup with pg_dump (Optional)
+
+> [!TIP]
+> **Recommended practice.** Do Tasks 3–6. They are not required to finish the TrailShop project. They prepare you for the exams.
 
 Create a backup of your TrailShop database in custom format. Run this in your operating system terminal (not inside psql):
 
@@ -159,7 +156,7 @@ pg_restore --list trailshop_backup.dump
 
 ---
 
-### Task 4 — Selective Restore
+### Task 4 — Selective Restore (Optional)
 
 Practice restoring a single table from your backup.
 
@@ -186,7 +183,7 @@ SELECT * FROM order_items LIMIT 5;
 
 ---
 
-### Task 5 — SQL Injection Exercise
+### Task 5 — SQL Injection Exercise (Optional)
 
 **a) Vulnerable code — do NOT use this pattern:**
 
@@ -216,17 +213,13 @@ def search_products(search_term):
 **Explain the difference:** In the vulnerable version, user input is pasted directly into the SQL string, so the database cannot distinguish between code and data. In the parameterized version, the query structure is sent separately from the values — the database knows exactly which parts are SQL and which are data, making injection impossible.
 
 > [!NOTE]
-> ***Your Answer***
+> **_Your Answer_**
 >
-> *(Write your answer here.)*
->
->
->
->
+> _(Write your answer here.)_
 
 ---
 
-### Task 6 — Design a Reviews Feature (Relational vs. Document)
+### Task 6 — Design a Reviews Feature (Relational vs. Document) (Optional)
 
 Design a product reviews feature for TrailShop using both approaches.
 
@@ -277,13 +270,9 @@ CREATE TABLE reviews (
 4. **Querying across reviews:** "Find all reviews with rating >= 4" is a simple `WHERE` clause in the relational model but requires reaching into nested arrays in the document model.
 
 > [!NOTE]
-> ***Your Answer***
+> **_Your Answer_**
 >
-> *(Write your answer here.)*
->
->
->
->
+> _(Write your answer here.)_
 
 ---
 
@@ -292,126 +281,96 @@ CREATE TABLE reviews (
 Answer each question in your own words. Refer back to the lecture material when needed.
 
 1. **What is the difference between a role and a user in PostgreSQL?**
-   *(Hint: In modern PostgreSQL, the distinction is simpler than you might expect.)*
-
+   _(Hint: In modern PostgreSQL, the distinction is simpler than you might expect.)_
 
 > [!NOTE]
-> ***Your Answer***
+> **_Your Answer_**
 >
-> *(Write your answer here.)*
->
-
-
+> The two commands are almost identical. The only difference is that `CREATE USER` is equivalent to `CREATE ROLE ... WITH LOGIN`. A role without `LOGIN` cannot connect to the database directly — it functions as a group that other roles can be members of.
 
 2. **What does `GRANT USAGE ON SCHEMA` do, and why is it needed before granting table-level privileges?**
 
-
 > [!NOTE]
-> ***Your Answer***
+> **_Your Answer_**
 >
-> *(Write your answer here.)*
->
-
-
+> GRANT USAGE ON SCHEMA is part of the schema-level Privileges its necessary so you can interact with objects inside a schema. USAGE gives you access to objects within the schema (required to use any table in the schema). Without `USAGE` on a schema, a role cannot see or interact with any tables inside it — even if it has been granted `SELECT` on those tables.
 
 3. **What are default privileges and when would you use them?**
-   *(Hint: think about tables that will be created in the future.)*
-
+   _(Hint: think about tables that will be created in the future.)_
 
 > [!NOTE]
-> ***Your Answer***
+> **_Your Answer_**
 >
-> *(Write your answer here.)*
->
-
-
+> The default privileges are readonly and readwrite. You use them to automatically apply it to objects created in the future. This prevents the common mistake of creating a new table and forgetting to grant access to it.
 
 4. **What is the difference between `pg_dump` and `pg_dumpall`?**
-   *(Consider: what does each one back up?)*
-
+   _(Consider: what does each one back up?)_
 
 > [!NOTE]
-> ***Your Answer***
+> **_Your Answer_**
 >
-> *(Write your answer here.)*
->
-
-
+> `pg_dump` exports a single database but does *not* include server-wide objects like roles, tablespaces, and database definition. For backups with all databases and roles use pg_dumpall.
 
 5. **Explain how SQL injection works in 2–3 sentences.**
 
-
 > [!NOTE]
-> ***Your Answer***
+> **_Your Answer_**
 >
-> *(Write your answer here.)*
->
-
-
+> SQL injection occurs when untrusted user input is directly concatenated into a dynamic SQL query string instead of using parameterized queries. This allows an attacker to manipulate the query structure by injecting malicious SQL commands (such as ' OR '1'='1), breaking out of the intended data field into executable code. As a result, the database executes the altered statement, enabling the attacker to bypass authentication, read confidential data, or tamper with and delete database records.
 
 6. **Why are parameterized queries the primary defense against SQL injection?**
-   *(What fundamental problem do they solve?)*
-
+   _(What fundamental problem do they solve?)_
 
 > [!NOTE]
-> ***Your Answer***
+> **_Your Answer_**
 >
-> *(Write your answer here.)*
->
-
-
+> Its the primary defense because the so called prepared statements send the data and query structure seperately to the database. 
 
 7. **Name four types of NoSQL databases and give one use case for each.**
-   *(Document, key-value, column-family, graph — what is each good at?)*
-
+   _(Document, key-value, column-family, graph — what is each good at?)_
 
 > [!NOTE]
-> ***Your Answer***
+> **_Your Answer_**
 >
-> *(Write your answer here.)*
->
-
-
+> 1. Document database --> it stores data as JSON-like documents
+> 2. key-value store --> it maps keys to values, optimized for simple lookups
+> 3. column-family store --> organized by columns rather than rows, optimized for writes
+> 4. Graph database --> it stores nodes and relationships, optimized for traversals.
 
 8. **What is the CAP theorem?**
-   *(Briefly explain the three properties and the trade-off.)*
-
+   _(Briefly explain the three properties and the trade-off.)_
 
 > [!NOTE]
-> ***Your Answer***
+> **_Your Answer_**
 >
-> *(Write your answer here.)*
->
-
-
+> The CAP theorem states that a distributed database can guarantee at most two of three properties: Consistency (Every read returns the most recent write), Availability (Every request receives a response and Partition Tolerance (the system continues to operate even if the network communcations between nodes fails). The real choice is mostly between consistency and availability. 
 
 9. **What is JSONB and how does it differ from JSON in PostgreSQL?**
-   *(Think about storage, indexing, and performance.)*
-
+   _(Think about storage, indexing, and performance.)_
 
 > [!NOTE]
-> ***Your Answer***
+> **_Your Answer_**
 >
-> *(Write your answer here.)*
->
-
-
+> JSONB stores JSON data in a binary format that supports indexing and efficient querying rather than plain-text string like standard JSON. Because of this binary structure, JSONB is slightly slower to insert but significantly faster to query and process, while JSON must be re-parsed on every read. Furthermore, JSONB supports GIN indexing for fast searches on nested keys and values, which plain JSON does not support.
 
 10. **When would you choose a document database over a relational database?**
-    *(Give at least two concrete scenarios.)*
+    _(Give at least two concrete scenarios.)_
+
+> [!NOTE]
+> **_Your Answer_**
+>
+> You choose a document database when data has a flexible, evolving schema and records are accessed as self-contained units rather than requiring multi-table joins. 
+> Two concrete scenarios:
+>
+> 1. Diverse Product Catalogs: Products like tents, boots, and electronics have completely different attributes, avoiding dozens of empty NULL columns in a rigid table.
+> 2. Content Management (CMS): An article, its author metadata, and comments can be stored and retrieved together as a single document in a single fast read.
 
 ---
 
+## Security Exercise — Spot and Fix the Vulnerabilities (Optional)
 
-> [!NOTE]
-> ***Your Answer***
->
-> *(Write your answer here.)*
->
-
-
-
-## Security Exercise — Spot and Fix the Vulnerabilities
+> [!TIP]
+> **Recommended practice.** Do this section. It is not required to finish the TrailShop project. It prepares you for the exams.
 
 Below are three code snippets that contain SQL injection vulnerabilities. For each one: identify the vulnerability, show a malicious input that would exploit it, and rewrite the code safely.
 
@@ -442,14 +401,11 @@ SELECT * FROM products WHERE category = 'Shoes' OR '1'='1' --' AND price >= 10
 The `--` comments out the rest, and `'1'='1'` is always true — the attacker sees every product.
 
 > [!NOTE]
-> ***Your Answer***
+> **_Your Answer_**
 >
-> *(Write your answer here.)*
+> _(Write your answer here.)_
 >
->
->
->
-**Safe version:**
+> **Safe version:**
 
 ```python
 def search_products(category, min_price):
@@ -487,14 +443,11 @@ SELECT * FROM customers WHERE email = 'admin@trailshop.com' --' AND password_has
 The password check is commented out entirely — the attacker logs in as any user.
 
 > [!NOTE]
-> ***Your Answer***
+> **_Your Answer_**
 >
-> *(Write your answer here.)*
+> _(Write your answer here.)_
 >
->
->
->
-**Safe version:**
+> **Safe version:**
 
 ```python
 def login(username, password):
@@ -535,14 +488,11 @@ VALUES ('Anna', 'Smith', 'test@x.com'); DELETE FROM customers; --')
 The attacker's input closes the INSERT and adds a DELETE that wipes the entire customers table.
 
 > [!NOTE]
-> ***Your Answer***
+> **_Your Answer_**
 >
-> *(Write your answer here.)*
+> _(Write your answer here.)_
 >
->
->
->
-**Safe version:**
+> **Safe version:**
 
 ```python
 def add_customer(first_name, last_name, email):
@@ -554,7 +504,10 @@ def add_customer(first_name, last_name, email):
 
 ---
 
-## NoSQL Design Exercise — Blog System
+## NoSQL Design Exercise — Blog System (Optional)
+
+> [!TIP]
+> **Recommended practice.** Do this section. It is not required to finish the TrailShop project. It prepares you for the exams.
 
 Design a blog system with **users**, **posts**, **comments**, and **tags** using both relational and document approaches.
 
@@ -663,27 +616,22 @@ CREATE TABLE comments (
 Write your own analysis using these five points as a starting framework:
 
 1. **Reading a full post with comments:** The document model returns everything in one query. The relational model needs joins across `posts`, `comments`, `users`, and `post_tags`. Document wins for this read pattern.
-
 2. **Updating a username:** In the relational model you update one row in `users`. In the document model the username is duplicated in every post and comment — you must update all of them. Relational wins for data consistency.
-
 3. **Querying across posts:** "Find all posts tagged 'hiking' with more than 5 comments" is straightforward in SQL with GROUP BY and HAVING. In the document model you need to query inside arrays, which is possible but less natural.
-
 4. **Schema flexibility:** Adding a `likes_count` to posts requires ALTER TABLE in the relational model. In documents you just start including the field — old documents without it still work fine.
-
 5. **Data integrity:** The relational model guarantees (via foreign keys) that every comment references a real post and a real user. Documents have no such built-in enforcement — an application bug could create orphaned or inconsistent data.
 
 > [!NOTE]
-> ***Your Answer***
+> **_Your Answer_**
 >
-> *(Write your answer here.)*
->
->
->
->
+> _(Write your answer here.)_
 
 ---
 
-## JSONB Practice
+## JSONB Practice (Optional)
+
+> [!TIP]
+> **Recommended practice.** Do this section. It is not required to finish the TrailShop project. It prepares you for the exams.
 
 For these exercises, first create a table to work with:
 
@@ -822,13 +770,14 @@ WHERE review_data @> '{"rating": 5}';
 
 ## Final TrailShop Project Submission
 
-This is the **last required project work** for the course. After completing the weekly tasks above, submit your complete TrailShop project package as described below. Weeks 49–51 are reserved for optional exam review — no further project submissions are required.
+This is the **last required project work** for the course. After completing Tasks 1–2 and the theory review, submit your complete TrailShop project package as described below. Weeks 49–51 are reserved for optional exam review — no further project submissions are required.
 
 ### Submission Requirements
 
 Your final TrailShop project submission must include:
 
 1. **Complete SQL script** (`trailshop_final.sql`) that:
+
    - Creates all tables with appropriate data types and constraints
    - Establishes all relationships (foreign keys)
    - Inserts sample data (at least 5 rows per table)
@@ -836,22 +785,22 @@ Your final TrailShop project submission must include:
    - Includes at least 3 indexes (with justification in comments)
    - Creates at least 2 roles with appropriate privileges
    - Contains at least 1 transaction demonstration
-
 2. **ER diagram** (image or PDF) showing your final schema with:
+
    - All entities and their attributes
    - Primary keys marked
    - Relationships with cardinality notation
    - Foreign keys indicated
-
 3. **Query collection** (`trailshop_queries.sql`) containing at least 10 queries that demonstrate:
+
    - Multi-table joins (at least 3 tables)
    - Aggregation with GROUP BY and HAVING
    - Subqueries (at least one correlated)
    - A CTE
    - CASE expressions
    - Set operations (at least one)
-
 4. **Reflection document** (`reflection.md`) — 300–500 words answering:
+
    - What was the most challenging part of building this database?
    - If you were to redesign it, what would you change and why?
    - How does your final schema differ from your Week 38 version? What drove the changes?
@@ -859,13 +808,13 @@ Your final TrailShop project submission must include:
 
 ### Grading Criteria
 
-| Criterion | Weight |
-|---|---|
-| Schema design (appropriate tables, types, constraints) | 25% |
-| Relationships and referential integrity | 20% |
-| Query variety and correctness | 25% |
-| Security, indexes, and transactions | 15% |
-| Reflection quality and depth | 15% |
+| Criterion                                              | Weight |
+| ------------------------------------------------------ | ------ |
+| Schema design (appropriate tables, types, constraints) | 25%    |
+| Relationships and referential integrity                | 20%    |
+| Query variety and correctness                          | 25%    |
+| Security, indexes, and transactions                    | 15%    |
+| Reflection quality and depth                           | 15%    |
 
 ---
 
@@ -879,4 +828,23 @@ After completing these exercises you should be able to:
 - Design data using both relational tables and JSON documents
 - Query and manipulate JSONB data in PostgreSQL
 
-Good work — these are skills you will use in every database project going forward. Submit your final TrailShop project package when you have finished this week's tasks.
+Good work — these are skills you will use in every database project going forward. Submit your final TrailShop project package when you have finished the required tasks.
+
+---
+
+## Submission Checklist
+
+**Required**
+
+- [x] Roles created and privileges tested (Tasks 1–2)
+- [x] Theory review questions answered
+- [ ] Final project package submitted (`trailshop_final.sql`, ER diagram, `trailshop_queries.sql`, `reflection.md`)
+
+**Recommended practice**
+
+- [ ] Backup created and a single table restored (Tasks 3–4)
+- [ ] SQL injection explanation written (Task 5)
+- [ ] Reviews feature compared in relational and document form (Task 6)
+- [ ] Security exercise completed
+- [ ] NoSQL blog design completed
+- [ ] JSONB practice queries completed

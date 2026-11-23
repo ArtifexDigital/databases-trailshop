@@ -24,7 +24,38 @@ By the end of this chapter you will be able to:
 
 ---
 
+## How to Study This Chapter
+
+The fundamentals are the focus. The advanced sections are helpful once those are solid.
+
+### Fundamentals — focus here
+
+- **Roles you will create** (sections 1.1–1.3 and 1.5–1.7): `CREATE ROLE` versus `CREATE USER`, the attribute table, groups with `INHERIT`, `ALTER ROLE`, `DROP ROLE`, and the TrailShop role setup.
+- **Privileges you will grant** (sections 2.1–2.4, 2.6–2.7, and 2.9–2.10): `GRANT` / `REVOKE`, table, schema, and database privileges, `USAGE` on a schema, default privileges for future tables, `ALL PRIVILEGES`, the `PUBLIC` role, and the TrailShop privilege setup.
+- **How a connection is allowed** (sections 3.1–3.2): the `pg_hba.conf` line shape, first matching rule wins, and the method table (`trust` for development only, `scram-sha-256` for production).
+- **Logical backup and restore** (sections 4.1–4.4 and 4.7): `pg_dump`, `pg_restore`, `pg_dumpall`, the three strategy names, and the TrailShop backup walkthrough.
+- **SQL injection and the defenses to learn first** (sections 5.1–5.4, 5.6, and 5.7): what the attack is, string concatenation, parameterized queries, least privilege as a limit on damage, and what an ORM does and does not protect.
+- **NoSQL at an introductory level** (all of sections 6 and 7): why NoSQL exists, the CAP theorem and eventual consistency, document, key-value, column-family, and graph databases with one use case each, and the TrailShop relational-versus-document comparison.
+- **JSONB as an idea** (sections 8.1–8.3 and 8.8): a JSONB column, inserting a document, the operators that read it, and when a JSONB column is a better fit than more tables.
+- **The choice** (all of section 9): when to stay relational, when a document store fits, and hybrid use.
+
+### Advanced — extra and helpful
+
+> [!TIP]
+> **Advanced.** Helpful extra. Read this after the fundamentals are solid.
+>
+> - **Nested role membership** (section 1.4).
+> - **Finer privileges** (sections 2.5 and 2.8): column-level `GRANT`, and `WITH GRANT OPTION`.
+> - **Connection configuration** (sections 3.3–3.4): SSL/TLS and the sample `pg_hba.conf` file.
+> - **Physical recovery** (sections 4.5–4.6): point-in-time recovery and `pg_basebackup`.
+> - **Extra injection defenses** (sections 5.5, 5.8, and 5.9): input validation, web application firewalls, and second-order injection.
+> - **JSONB beyond reading a document** (sections 8.4–8.7): `jsonb_set`, a GIN index, SQL/JSON path, and the long reviews example.
+
+---
+
 ## 1 — Roles and Users
+
+> **Mixed.** Sections 1.1–1.3 and 1.5–1.7 are fundamentals. Section 1.4 (nested role membership) is advanced.
 
 In a single-developer project you might connect to PostgreSQL as a superuser and never think twice. In a production system with multiple team members, applications, and services, that approach is dangerous. PostgreSQL uses a **role-based access control** system to manage who can connect and what they can do once connected.
 
@@ -53,16 +84,16 @@ In practice, many administrators use `CREATE ROLE` for everything and explicitly
 
 Every role has a set of boolean attributes that control its capabilities at the server level. These are separate from object-level privileges (covered in Section 2).
 
-| Attribute | Meaning |
-|---|---|
-| `LOGIN` | Role can connect to the database. Without this, the role is a group only. |
-| `SUPERUSER` | Bypasses all permission checks. Use sparingly — like a master key. |
-| `CREATEDB` | Role can create new databases. |
-| `CREATEROLE` | Role can create, alter, and drop other roles. |
-| `INHERIT` | Role automatically inherits privileges of roles it is a member of. Default is `INHERIT`. |
-| `REPLICATION` | Role can initiate streaming replication. Required for physical backups. |
-| `BYPASSRLS` | Role bypasses Row-Level Security policies. |
-| `CONNECTION LIMIT n` | Maximum number of concurrent connections for this role. `-1` means unlimited. |
+| Attribute              | Meaning                                                                                    |
+| ---------------------- | ------------------------------------------------------------------------------------------ |
+| `LOGIN`              | Role can connect to the database. Without this, the role is a group only.                  |
+| `SUPERUSER`          | Bypasses all permission checks. Use sparingly — like a master key.                        |
+| `CREATEDB`           | Role can create new databases.                                                             |
+| `CREATEROLE`         | Role can create, alter, and drop other roles.                                              |
+| `INHERIT`            | Role automatically inherits privileges of roles it is a member of. Default is `INHERIT`. |
+| `REPLICATION`        | Role can initiate streaming replication. Required for physical backups.                    |
+| `BYPASSRLS`          | Role bypasses Row-Level Security policies.                                                 |
+| `CONNECTION LIMIT n` | Maximum number of concurrent connections for this role. `-1` means unlimited.            |
 
 You can combine multiple attributes in a single statement:
 
@@ -97,7 +128,10 @@ GRANT marketing_team TO bob;
 
 Now both Alice and Bob inherit whatever privileges are granted to `marketing_team`. If you later grant `SELECT` on the `orders` table to `marketing_team`, both Alice and Bob can immediately query it — without any changes to their individual accounts.
 
-### 1.4 Role Hierarchy: Nested Group Membership
+### 1.4 Role Hierarchy: Nested Group Membership (Advanced)
+
+> [!TIP]
+> **Advanced.** Helpful extra. Read this after the fundamentals in this section are solid.
 
 Groups can be members of other groups, creating a hierarchy:
 
@@ -192,6 +226,8 @@ The marketing analyst can read data but not modify it. The warehouse manager can
 
 ## 2 — Privileges
 
+> **Mixed.** Sections 2.1–2.4, 2.6–2.7, and 2.9–2.10 are fundamentals. Sections 2.5 and 2.8 (column-level `GRANT` and `WITH GRANT OPTION`) are advanced.
+
 Roles define *who* can connect. **Privileges** define *what* they can do once connected. PostgreSQL's privilege system is granular — you can control access at the database, schema, table, and even column level.
 
 As *Database Design — 2nd Edition* (Watt & Eng) emphasizes, the principle of **least privilege** means every user should have only the minimum access required for their job — no more.
@@ -209,15 +245,15 @@ REVOKE privilege_list ON object FROM role;
 
 Tables support the following privileges:
 
-| Privilege | Allows |
-|---|---|
-| `SELECT` | Read rows from the table |
-| `INSERT` | Add new rows |
-| `UPDATE` | Modify existing rows |
-| `DELETE` | Remove rows |
-| `TRUNCATE` | Empty the entire table (faster than DELETE, no row-by-row logging) |
-| `REFERENCES` | Create foreign keys that reference this table |
-| `TRIGGER` | Create triggers on this table |
+| Privilege      | Allows                                                             |
+| -------------- | ------------------------------------------------------------------ |
+| `SELECT`     | Read rows from the table                                           |
+| `INSERT`     | Add new rows                                                       |
+| `UPDATE`     | Modify existing rows                                               |
+| `DELETE`     | Remove rows                                                        |
+| `TRUNCATE`   | Empty the entire table (faster than DELETE, no row-by-row logging) |
+| `REFERENCES` | Create foreign keys that reference this table                      |
+| `TRIGGER`    | Create triggers on this table                                      |
 
 Examples:
 
@@ -236,10 +272,10 @@ GRANT ALL PRIVILEGES ON products TO trailshop_admin;
 
 Before a role can interact with objects inside a schema, it needs schema-level access:
 
-| Privilege | Allows |
-|---|---|
-| `USAGE` | Access objects within the schema (required to use any table in the schema) |
-| `CREATE` | Create new objects (tables, views, etc.) within the schema |
+| Privilege  | Allows                                                                     |
+| ---------- | -------------------------------------------------------------------------- |
+| `USAGE`  | Access objects within the schema (required to use any table in the schema) |
+| `CREATE` | Create new objects (tables, views, etc.) within the schema                 |
 
 ```sql
 -- Allow the readonly group to access objects in the public schema
@@ -253,18 +289,21 @@ Without `USAGE` on a schema, a role cannot see or interact with any tables insid
 
 ### 2.4 Database-Level Privileges
 
-| Privilege | Allows |
-|---|---|
-| `CONNECT` | Connect to the database |
-| `CREATE` | Create new schemas in the database |
-| `TEMPORARY` | Create temporary tables |
+| Privilege     | Allows                             |
+| ------------- | ---------------------------------- |
+| `CONNECT`   | Connect to the database            |
+| `CREATE`    | Create new schemas in the database |
+| `TEMPORARY` | Create temporary tables            |
 
 ```sql
 GRANT CONNECT ON DATABASE trailshop TO trailshop_readonly;
 GRANT CONNECT, CREATE ON DATABASE trailshop TO trailshop_admin;
 ```
 
-### 2.5 Column-Level Privileges
+### 2.5 Column-Level Privileges (Advanced)
+
+> [!TIP]
+> **Advanced.** Helpful extra. Read this after the fundamentals in this section are solid.
 
 Sometimes you need finer control. For example, the marketing team should see customer names and cities but not their email addresses or phone numbers:
 
@@ -309,7 +348,10 @@ GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO trailshop_admin;
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO trailshop_admin;
 ```
 
-### 2.8 WITH GRANT OPTION
+### 2.8 WITH GRANT OPTION (Advanced)
+
+> [!TIP]
+> **Advanced.** Helpful extra. Read this after the fundamentals in this section are solid.
 
 By default, a role that receives a privilege cannot pass it on to others. The `WITH GRANT OPTION` clause changes this:
 
@@ -388,6 +430,8 @@ GRANT SELECT (customer_id, first_name, last_name, city, country)
 
 ## 3 — Authentication
 
+> **Mixed.** Sections 3.1–3.2 are fundamentals. Sections 3.3–3.4 (SSL/TLS and the sample `pg_hba.conf` file) are advanced.
+
 Roles and privileges control *what* a user can do, but **authentication** controls *whether they can connect at all*. PostgreSQL handles authentication through a configuration file called `pg_hba.conf` (HBA stands for Host-Based Authentication).
 
 ### 3.1 pg_hba.conf Overview
@@ -400,31 +444,37 @@ TYPE   DATABASE   USER        ADDRESS          METHOD
 
 PostgreSQL reads the file top-to-bottom and uses the **first matching rule**. If no rule matches, the connection is rejected.
 
-| Field | Meaning |
-|---|---|
-| TYPE | `local` (Unix socket), `host` (TCP/IP), `hostssl` (SSL only), `hostnossl` |
-| DATABASE | Database name, `all`, or comma-separated list |
-| USER | Role name, `all`, or comma-separated list |
-| ADDRESS | IP address/range (for host types), not used for `local` |
-| METHOD | Authentication method to use |
+| Field    | Meaning                                                                           |
+| -------- | --------------------------------------------------------------------------------- |
+| TYPE     | `local` (Unix socket), `host` (TCP/IP), `hostssl` (SSL only), `hostnossl` |
+| DATABASE | Database name, `all`, or comma-separated list                                   |
+| USER     | Role name, `all`, or comma-separated list                                       |
+| ADDRESS  | IP address/range (for host types), not used for `local`                         |
+| METHOD   | Authentication method to use                                                      |
 
 ### 3.2 Authentication Methods
 
-| Method | Description | Use Case |
-|---|---|---|
-| `trust` | No password required — anyone who can connect is accepted | Local development only. **Never in production.** |
-| `password` | Plain-text password sent over the network | Insecure. Avoid. |
-| `md5` | MD5-hashed password challenge | Legacy. Being replaced by scram-sha-256. |
-| `scram-sha-256` | Modern salted challenge-response authentication | **Recommended for production.** |
-| `peer` | OS username must match database role name | Local Unix connections. |
-| `ident` | Like peer, but for TCP connections via an ident server | Rare. |
-| `cert` | Client SSL certificate authentication | High-security environments. |
+| Method            | Description                                                | Use Case                                               |
+| ----------------- | ---------------------------------------------------------- | ------------------------------------------------------ |
+| `trust`         | No password required — anyone who can connect is accepted | Local development only. **Never in production.** |
+| `password`      | Plain-text password sent over the network                  | Insecure. Avoid.                                       |
+| `md5`           | MD5-hashed password challenge                              | Legacy. Being replaced by scram-sha-256.               |
+| `scram-sha-256` | Modern salted challenge-response authentication            | **Recommended for production.**                  |
+| `peer`          | OS username must match database role name                  | Local Unix connections.                                |
+| `ident`         | Like peer, but for TCP connections via an ident server     | Rare.                                                  |
+| `cert`          | Client SSL certificate authentication                      | High-security environments.                            |
 
-### 3.3 Connection Security: SSL/TLS
+### 3.3 Connection Security: SSL/TLS (Advanced)
+
+> [!TIP]
+> **Advanced.** Helpful extra. Read this after the fundamentals in this section are solid.
 
 For any connection over a network, you should use SSL/TLS encryption to prevent eavesdropping. PostgreSQL supports SSL natively. The `hostssl` connection type in `pg_hba.conf` requires SSL for matching connections.
 
-### 3.4 Example pg_hba.conf Entries
+### 3.4 Example pg_hba.conf Entries (Advanced)
+
+> [!TIP]
+> **Advanced.** Helpful extra. Read this after the fundamentals in this section are solid.
 
 ```
 # Local connections: trust for the postgres superuser (development only)
@@ -462,6 +512,8 @@ pg_ctl reload
 
 ## 4 — Backup and Restore
 
+> **Mixed.** Sections 4.1–4.4 and 4.7 are fundamentals. Sections 4.5–4.6 (point-in-time recovery and `pg_basebackup`) are advanced.
+
 Databases fail. Disks crash. Humans make mistakes. A `DELETE` without a `WHERE` clause can wipe out years of data in milliseconds. **Backups are not optional** — they are the single most important administrative task.
 
 As Watt & Eng stress in *Database Design — 2nd Edition*, a database without a backup strategy is a liability, not an asset.
@@ -472,12 +524,12 @@ As Watt & Eng stress in *Database Design — 2nd Edition*, a database without a 
 
 #### Output Formats
 
-| Format | Flag | Description |
-|---|---|---|
-| Plain SQL | `-Fp` (default) | Human-readable SQL script. Can be restored with `psql`. |
-| Custom | `-Fc` | Compressed, non-human-readable. Supports selective restore. **Recommended.** |
-| Directory | `-Fd` | One file per table, supports parallel dump. Good for large databases. |
-| Tar | `-Ft` | Tar archive format. |
+| Format    | Flag              | Description                                                                        |
+| --------- | ----------------- | ---------------------------------------------------------------------------------- |
+| Plain SQL | `-Fp` (default) | Human-readable SQL script. Can be restored with `psql`.                          |
+| Custom    | `-Fc`           | Compressed, non-human-readable. Supports selective restore. **Recommended.** |
+| Directory | `-Fd`           | One file per table, supports parallel dump. Good for large databases.              |
+| Tar       | `-Ft`           | Tar archive format.                                                                |
 
 #### Basic Usage
 
@@ -548,13 +600,16 @@ A common strategy is to combine `pg_dumpall --globals-only` (for roles) with ind
 
 ### 4.4 Backup Strategies
 
-| Strategy | Description | Pros | Cons |
-|---|---|---|---|
-| Full backup | Complete dump at regular intervals | Simple, self-contained | Slow for large databases, large files |
-| Incremental | Only changes since last backup | Smaller, faster | More complex to restore |
-| Continuous archiving (WAL) | Archive Write-Ahead Log files continuously | Enables point-in-time recovery | Requires more setup and storage |
+| Strategy                   | Description                                | Pros                           | Cons                                  |
+| -------------------------- | ------------------------------------------ | ------------------------------ | ------------------------------------- |
+| Full backup                | Complete dump at regular intervals         | Simple, self-contained         | Slow for large databases, large files |
+| Incremental                | Only changes since last backup             | Smaller, faster                | More complex to restore               |
+| Continuous archiving (WAL) | Archive Write-Ahead Log files continuously | Enables point-in-time recovery | Requires more setup and storage       |
 
-### 4.5 Point-in-Time Recovery (PITR)
+### 4.5 Point-in-Time Recovery (PITR, Advanced)
+
+> [!TIP]
+> **Advanced.** Helpful extra. Read this after the fundamentals in this section are solid.
 
 PostgreSQL writes every change to the **Write-Ahead Log (WAL)** before applying it to the actual data files. By archiving WAL files, you can restore a database to *any point in time* — not just the moment of the last backup.
 
@@ -566,7 +621,10 @@ The concept:
 
 This is critical for production systems where you might need to recover to the state "five minutes before the accidental DELETE."
 
-### 4.6 pg_basebackup: Physical Backups
+### 4.6 pg_basebackup: Physical Backups (Advanced)
+
+> [!TIP]
+> **Advanced.** Helpful extra. Read this after the fundamentals in this section are solid.
 
 `pg_basebackup` creates a physical copy of the entire PostgreSQL data directory, which is used as the starting point for PITR:
 
@@ -574,12 +632,12 @@ This is critical for production systems where you might need to recover to the s
 pg_basebackup -U replication_user -D /backups/base_backup -Ft -z -P
 ```
 
-| Flag | Meaning |
-|---|---|
-| `-D` | Destination directory |
-| `-Ft` | Tar format |
-| `-z` | Compress with gzip |
-| `-P` | Show progress |
+| Flag    | Meaning               |
+| ------- | --------------------- |
+| `-D`  | Destination directory |
+| `-Ft` | Tar format            |
+| `-z`  | Compress with gzip    |
+| `-P`  | Show progress         |
 
 ### 4.7 TrailShop Backup Walkthrough
 
@@ -614,6 +672,8 @@ pg_restore -U postgres -d trailshop_restored /backups/trailshop_20261125.dump
 ---
 
 ## 5 — SQL Injection
+
+> **Mixed.** Sections 5.1–5.4, 5.6, and 5.7 are fundamentals. Sections 5.5, 5.8, and 5.9 (input validation, web application firewalls, and second-order injection) are advanced.
 
 You've secured the database with roles and privileges, set up authentication, and configured backups. But there's another threat that comes not from inside the database, but from the *application layer*: **SQL injection**.
 
@@ -743,7 +803,10 @@ cur.execute(
 )
 ```
 
-### 5.5 Defense Strategy 2: Input Validation and Sanitization
+### 5.5 Defense Strategy 2: Input Validation and Sanitization (Advanced)
+
+> [!TIP]
+> **Advanced.** Helpful extra. Read this after the fundamentals in this section are solid.
 
 While parameterized queries are the primary defense, validating input provides an additional layer:
 
@@ -793,11 +856,17 @@ User.objects.raw(f"SELECT * FROM users WHERE username = '{username}'")
 User.objects.raw("SELECT * FROM users WHERE username = %s", [username])
 ```
 
-### 5.8 Defense Strategy 5: Web Application Firewalls (WAF)
+### 5.8 Defense Strategy 5: Web Application Firewalls (WAF, Advanced)
+
+> [!TIP]
+> **Advanced.** Helpful extra. Read this after the fundamentals in this section are solid.
 
 A Web Application Firewall sits between users and the application, scanning HTTP requests for common attack patterns. WAFs can block many injection attempts but should be considered a **supplementary defense**, not a primary one — skilled attackers can often bypass WAFs with encoding tricks.
 
-### 5.9 Second-Order SQL Injection
+### 5.9 Second-Order SQL Injection (Advanced)
+
+> [!TIP]
+> **Advanced.** Helpful extra. Read this after the fundamentals in this section are solid.
 
 In second-order injection, the malicious input is stored safely in the database but then used unsafely in a later query. For example:
 
@@ -813,6 +882,8 @@ The defense is the same: **always use parameterized queries**, even when the dat
 ---
 
 ## 6 — NoSQL: Beyond the Relational Model
+
+> **Fundamentals.** This whole section is core: why NoSQL exists, the CAP theorem, and the four database types with one use case each.
 
 Everything you've learned this semester has been about relational databases — and for good reason. Relational databases are the right choice for most applications. But they're not the *only* choice. Some problems are awkward to model relationally, and some systems have performance or scalability needs that push beyond what traditional relational databases handle easily.
 
@@ -840,10 +911,10 @@ In these cases, a different data model might be a better fit.
 
 The **CAP theorem** (Brewer, 2000) states that a distributed database can guarantee at most two of three properties:
 
-| Property | Meaning |
-|---|---|
-| **Consistency** | Every read returns the most recent write |
-| **Availability** | Every request receives a response (even if it's not the latest data) |
+| Property                      | Meaning                                                                           |
+| ----------------------------- | --------------------------------------------------------------------------------- |
+| **Consistency**         | Every read returns the most recent write                                          |
+| **Availability**        | Every request receives a response (even if it's not the latest data)              |
 | **Partition Tolerance** | The system continues to operate even if network communication between nodes fails |
 
 Since network partitions *will* happen in any distributed system, the real choice is between **consistency** and **availability** during a partition:
@@ -1010,19 +1081,21 @@ In a relational database, this would require multiple JOINs. In a graph database
 
 ### 6.8 NoSQL Comparison Table
 
-| Type | Data Model | Example DB | Best For | Not Good For |
-|---|---|---|---|---|
-| Document | JSON-like documents | MongoDB, CouchDB | Flexible schemas, catalogs, CMS | Complex joins, multi-document transactions |
-| Key-Value | Key → Value pairs | Redis, DynamoDB | Caching, sessions, counters | Complex queries, relationships |
-| Column-Family | Rows with dynamic columns | Cassandra, HBase | Time-series, IoT, high write volume | Ad-hoc queries, complex reads |
-| Graph | Nodes and edges | Neo4j, Amazon Neptune | Relationships, recommendations, networks | Bulk data processing, simple CRUD |
-| Relational | Tables with fixed schema | PostgreSQL, MySQL | Structured data, ACID, complex queries | Massive horizontal scale, flexible schema |
+| Type          | Data Model                | Example DB            | Best For                                 | Not Good For                               |
+| ------------- | ------------------------- | --------------------- | ---------------------------------------- | ------------------------------------------ |
+| Document      | JSON-like documents       | MongoDB, CouchDB      | Flexible schemas, catalogs, CMS          | Complex joins, multi-document transactions |
+| Key-Value     | Key → Value pairs        | Redis, DynamoDB       | Caching, sessions, counters              | Complex queries, relationships             |
+| Column-Family | Rows with dynamic columns | Cassandra, HBase      | Time-series, IoT, high write volume      | Ad-hoc queries, complex reads              |
+| Graph         | Nodes and edges           | Neo4j, Amazon Neptune | Relationships, recommendations, networks | Bulk data processing, simple CRUD          |
+| Relational    | Tables with fixed schema  | PostgreSQL, MySQL     | Structured data, ACID, complex queries   | Massive horizontal scale, flexible schema  |
 
 > **Reference:** [MongoDB — Introduction](https://www.mongodb.com/docs/manual/introduction/)
 
 ---
 
 ## 7 — TrailShop Comparison: Relational vs Document
+
+> **Fundamentals.** This whole section is core: the same TrailShop data as tables and as a document.
 
 To make the difference concrete, let's model the same data — product reviews — in both relational and document form.
 
@@ -1089,20 +1162,22 @@ One query retrieves everything — no JOINs needed.
 
 ### 7.3 Comparison
 
-| Criterion | Relational (PostgreSQL) | Document (MongoDB) |
-|---|---|---|
-| Schema enforcement | Strict — all rows follow the same structure | Flexible — each document can differ |
-| Adding a new attribute | Requires ALTER TABLE or an EAV pattern | Just add a field to the document |
-| Querying relationships | JOINs — powerful but can be slow | Embedded data — fast reads, but duplication |
-| Data integrity | FOREIGN KEY, CHECK, UNIQUE constraints | Application-level validation (mostly) |
-| Transaction support | Full ACID across multiple tables | ACID per document; multi-document transactions added in MongoDB 4.0+ |
-| Storage efficiency | Normalized — no duplication | Denormalized — data may be duplicated |
-| Update complexity | Update one row, all references see the change | Must update every copy of duplicated data |
-| Best for this scenario | Reviews that need independent querying, analytics | Product pages that need fast single-document reads |
+| Criterion              | Relational (PostgreSQL)                           | Document (MongoDB)                                                   |
+| ---------------------- | ------------------------------------------------- | -------------------------------------------------------------------- |
+| Schema enforcement     | Strict — all rows follow the same structure      | Flexible — each document can differ                                 |
+| Adding a new attribute | Requires ALTER TABLE or an EAV pattern            | Just add a field to the document                                     |
+| Querying relationships | JOINs — powerful but can be slow                 | Embedded data — fast reads, but duplication                         |
+| Data integrity         | FOREIGN KEY, CHECK, UNIQUE constraints            | Application-level validation (mostly)                                |
+| Transaction support    | Full ACID across multiple tables                  | ACID per document; multi-document transactions added in MongoDB 4.0+ |
+| Storage efficiency     | Normalized — no duplication                      | Denormalized — data may be duplicated                               |
+| Update complexity      | Update one row, all references see the change     | Must update every copy of duplicated data                            |
+| Best for this scenario | Reviews that need independent querying, analytics | Product pages that need fast single-document reads                   |
 
 ---
 
 ## 8 — PostgreSQL JSONB: Best of Both Worlds
+
+> **Mixed.** Sections 8.1–8.3 and 8.8 are fundamentals. Sections 8.4–8.7 (`jsonb_set`, a GIN index, SQL/JSON path, and the long reviews example) are advanced.
 
 What if you want the reliability and query power of PostgreSQL *and* the flexibility of JSON documents? PostgreSQL's **JSONB** data type gives you exactly that.
 
@@ -1150,14 +1225,14 @@ Notice how one review has a `photos` array and the other doesn't. This flexibili
 
 PostgreSQL provides several operators for querying JSONB:
 
-| Operator | Returns | Description |
-|---|---|---|
-| `->` | JSONB | Get JSON object field by key |
-| `->>` | TEXT | Get JSON object field as text |
-| `@>` | BOOLEAN | Does the JSON contain the given value? |
-| `?` | BOOLEAN | Does the JSON contain the given key? |
-| `#>` | JSONB | Get value at a nested path |
-| `#>>` | TEXT | Get value at a nested path as text |
+| Operator | Returns | Description                            |
+| -------- | ------- | -------------------------------------- |
+| `->`   | JSONB   | Get JSON object field by key           |
+| `->>`  | TEXT    | Get JSON object field as text          |
+| `@>`   | BOOLEAN | Does the JSON contain the given value? |
+| `?`    | BOOLEAN | Does the JSON contain the given key?   |
+| `#>`   | JSONB   | Get value at a nested path             |
+| `#>>`  | TEXT    | Get value at a nested path as text     |
 
 #### Extracting Fields
 
@@ -1198,7 +1273,10 @@ FROM product_reviews
 WHERE review_data ? 'photos';
 ```
 
-### 8.4 Updating JSONB Data
+### 8.4 Updating JSONB Data (Advanced)
+
+> [!TIP]
+> **Advanced.** Helpful extra. Read this after the fundamentals in this section are solid.
 
 #### Using jsonb_set()
 
@@ -1223,7 +1301,10 @@ SET review_data = review_data || '{"edited": true, "edit_date": "2026-11-25"}'
 WHERE review_id = 1;
 ```
 
-### 8.5 GIN Indexes on JSONB
+### 8.5 GIN Indexes on JSONB (Advanced)
+
+> [!TIP]
+> **Advanced.** Helpful extra. Read this after the fundamentals in this section are solid.
 
 Without an index, JSONB queries scan every row. A **GIN (Generalized Inverted Index)** index makes `@>`, `?`, `?|`, and `?&` operators fast:
 
@@ -1239,7 +1320,10 @@ For queries that only access specific keys, a targeted expression index may be m
 CREATE INDEX idx_review_rating ON product_reviews ((review_data->>'rating'));
 ```
 
-### 8.6 SQL/JSON Path Queries
+### 8.6 SQL/JSON Path Queries (Advanced)
+
+> [!TIP]
+> **Advanced.** Helpful extra. Read this after the fundamentals in this section are solid.
 
 PostgreSQL 12+ supports the SQL/JSON path language for more expressive queries:
 
@@ -1250,7 +1334,10 @@ FROM product_reviews
 WHERE jsonb_path_exists(review_data, '$.pros[*] ? (@ == "waterproof")');
 ```
 
-### 8.7 Complete TrailShop JSONB Example
+### 8.7 Complete TrailShop JSONB Example (Advanced)
+
+> [!TIP]
+> **Advanced.** Helpful extra. Read this after the fundamentals in this section are solid.
 
 A flexible product table that combines relational structure with JSONB flexibility:
 
@@ -1291,14 +1378,14 @@ CREATE INDEX idx_product_attrs ON products_flexible USING GIN (attributes);
 
 ### 8.8 When to Use JSONB vs Separate Tables
 
-| Use JSONB When | Use Separate Tables When |
-|---|---|
-| Attributes vary widely across rows | All rows share the same structure |
-| Schema changes frequently | Schema is stable |
-| You query the JSON data occasionally | You query and filter the data frequently |
-| Data is mostly read as a blob | Data is joined, aggregated, or reported on |
-| You need flexible metadata storage | You need referential integrity (foreign keys) |
-| Rapid prototyping and iteration | Production systems with strict data quality needs |
+| Use JSONB When                       | Use Separate Tables When                          |
+| ------------------------------------ | ------------------------------------------------- |
+| Attributes vary widely across rows   | All rows share the same structure                 |
+| Schema changes frequently            | Schema is stable                                  |
+| You query the JSON data occasionally | You query and filter the data frequently          |
+| Data is mostly read as a blob        | Data is joined, aggregated, or reported on        |
+| You need flexible metadata storage   | You need referential integrity (foreign keys)     |
+| Rapid prototyping and iteration      | Production systems with strict data quality needs |
 
 A common pattern is to use relational columns for data you query and filter on (price, category, stock) and JSONB for variable metadata (product-specific attributes, user preferences, feature flags).
 
@@ -1306,22 +1393,24 @@ A common pattern is to use relational columns for data you query and filter on (
 
 ## 9 — When Relational vs NoSQL: A Decision Framework
 
+> **Fundamentals.** This whole section is core: when to stay relational, when a document store fits, and hybrid use.
+
 The question is not "which is better?" but "which is better *for this problem*?"
 
 ### 9.1 Decision Matrix
 
-| Criterion | Choose Relational | Choose NoSQL |
-|---|---|---|
-| Data structure | Fixed, predictable schema | Variable, evolving schema |
-| Relationships | Complex relationships between entities | Few or embedded relationships |
-| Consistency | ACID transactions required | Eventual consistency acceptable |
-| Query patterns | Complex queries, JOINs, aggregations | Simple lookups by key or document |
-| Scale | Vertical (bigger server) | Horizontal (more servers) |
-| Data volume | Moderate (GBs to low TBs) | Massive (TBs to PBs) |
-| Write throughput | Moderate | Very high (millions per second) |
-| Development speed | Stable schema, long-term projects | Rapid prototyping, evolving requirements |
-| Team expertise | SQL skills widely available | Requires learning new query paradigms |
-| Tooling and ecosystem | Mature, extensive | Growing, varies by database |
+| Criterion             | Choose Relational                      | Choose NoSQL                             |
+| --------------------- | -------------------------------------- | ---------------------------------------- |
+| Data structure        | Fixed, predictable schema              | Variable, evolving schema                |
+| Relationships         | Complex relationships between entities | Few or embedded relationships            |
+| Consistency           | ACID transactions required             | Eventual consistency acceptable          |
+| Query patterns        | Complex queries, JOINs, aggregations   | Simple lookups by key or document        |
+| Scale                 | Vertical (bigger server)               | Horizontal (more servers)                |
+| Data volume           | Moderate (GBs to low TBs)              | Massive (TBs to PBs)                     |
+| Write throughput      | Moderate                               | Very high (millions per second)          |
+| Development speed     | Stable schema, long-term projects      | Rapid prototyping, evolving requirements |
+| Team expertise        | SQL skills widely available            | Requires learning new query paradigms    |
+| Tooling and ecosystem | Mature, extensive                      | Growing, varies by database              |
 
 ### 9.2 Hybrid Approaches
 
@@ -1345,47 +1434,48 @@ Relational databases are the safest default choice. They handle most workloads w
 
 ## Key Terms
 
-| Term | Definition |
-|---|---|
-| **Role** | A database entity that can own objects and have privileges; may or may not be able to log in |
-| **User** | A role with the LOGIN attribute — can connect to the database |
-| **GRANT** | SQL command to give privileges on objects to roles |
-| **REVOKE** | SQL command to remove privileges from roles |
-| **Privilege** | A specific permission (SELECT, INSERT, etc.) on a database object |
-| **pg_dump** | PostgreSQL utility for creating logical backups of a single database |
-| **pg_restore** | PostgreSQL utility for restoring backups created by pg_dump in non-plain formats |
-| **Backup** | A copy of database data and/or structure that can be used for recovery |
-| **Restore** | The process of recreating a database from a backup |
-| **SQL injection** | An attack where malicious SQL is inserted through user input into a query |
-| **Parameterized query** | A query where user input is passed as parameters, not concatenated into the SQL string |
-| **Prepared statement** | A precompiled SQL statement that uses parameter placeholders, preventing injection |
-| **NoSQL** | An umbrella term for databases that use data models other than relational tables |
-| **Document database** | A NoSQL database that stores data as JSON-like documents (e.g., MongoDB) |
-| **JSON** | JavaScript Object Notation — a lightweight text format for structured data |
-| **JSONB** | PostgreSQL's binary JSON type, supporting indexing and efficient querying |
-| **Key-value store** | A NoSQL database that maps keys to values, optimized for simple lookups (e.g., Redis) |
-| **Column-family store** | A NoSQL database organized by columns rather than rows, optimized for writes (e.g., Cassandra) |
-| **Graph database** | A NoSQL database that stores nodes and relationships, optimized for traversals (e.g., Neo4j) |
-| **CAP theorem** | States that a distributed system can guarantee at most two of: Consistency, Availability, Partition tolerance |
-| **Eventual consistency** | A model where replicas will converge to the same value over time, but may differ briefly |
-| **pg_hba.conf** | PostgreSQL's Host-Based Authentication configuration file |
+> **Fundamentals.** Every term in this glossary is core vocabulary. The Level column marks that. Advanced mechanisms such as point-in-time recovery, `pg_basebackup`, and second-order injection are explained in the chapter, and they are extra.
+
+| Term                           | Level       | Definition                                                                                                    |
+| ------------------------------ | ----------- | ------------------------------------------------------------------------------------------------------------- |
+| **Role**                 | Fundamental | A database entity that can own objects and have privileges; may or may not be able to log in                  |
+| **User**                 | Fundamental | A role with the LOGIN attribute — can connect to the database                                                |
+| **GRANT**                | Fundamental | SQL command to give privileges on objects to roles                                                            |
+| **REVOKE**               | Fundamental | SQL command to remove privileges from roles                                                                   |
+| **Privilege**            | Fundamental | A specific permission (SELECT, INSERT, etc.) on a database object                                             |
+| **pg_dump**              | Fundamental | PostgreSQL utility for creating logical backups of a single database                                          |
+| **pg_restore**           | Fundamental | PostgreSQL utility for restoring backups created by pg_dump in non-plain formats                              |
+| **Backup**               | Fundamental | A copy of database data and/or structure that can be used for recovery                                        |
+| **Restore**              | Fundamental | The process of recreating a database from a backup                                                            |
+| **SQL injection**        | Fundamental | An attack where malicious SQL is inserted through user input into a query                                     |
+| **Parameterized query**  | Fundamental | A query where user input is passed as parameters, not concatenated into the SQL string                        |
+| **Prepared statement**   | Fundamental | A precompiled SQL statement that uses parameter placeholders, preventing injection                            |
+| **NoSQL**                | Fundamental | An umbrella term for databases that use data models other than relational tables                              |
+| **Document database**    | Fundamental | A NoSQL database that stores data as JSON-like documents (e.g., MongoDB)                                      |
+| **JSON**                 | Fundamental | JavaScript Object Notation — a lightweight text format for structured data                                   |
+| **JSONB**                | Fundamental | PostgreSQL's binary JSON type, supporting indexing and efficient querying                                     |
+| **Key-value store**      | Fundamental | A NoSQL database that maps keys to values, optimized for simple lookups (e.g., Redis)                         |
+| **Column-family store**  | Fundamental | A NoSQL database organized by columns rather than rows, optimized for writes (e.g., Cassandra)                |
+| **Graph database**       | Fundamental | A NoSQL database that stores nodes and relationships, optimized for traversals (e.g., Neo4j)                  |
+| **CAP theorem**          | Fundamental | States that a distributed system can guarantee at most two of: Consistency, Availability, Partition tolerance |
+| **Eventual consistency** | Fundamental | A model where replicas will converge to the same value over time, but may differ briefly                      |
+| **pg_hba.conf**          | Fundamental | PostgreSQL's Host-Based Authentication configuration file                                                     |
 
 ---
 
 ## Reading Assignments
 
+> **Mixed.** Both reading lists stay as written. Further Reading is extra documentation for the NoSQL and JSONB topics.
+
 1. **PostgreSQL Documentation — Database Roles:**
    [https://www.postgresql.org/docs/current/user-manag.html](https://www.postgresql.org/docs/current/user-manag.html)
    Read Chapters 22.1 through 22.4 for a thorough understanding of role management.
-
 2. **PostgreSQL Documentation — GRANT:**
    [https://www.postgresql.org/docs/current/sql-grant.html](https://www.postgresql.org/docs/current/sql-grant.html)
    Study the full syntax and examples for granting privileges at various levels.
-
 3. **PostgreSQL Documentation — Backup and Restore:**
    [https://www.postgresql.org/docs/current/backup.html](https://www.postgresql.org/docs/current/backup.html)
    Read Chapters 26.1 (SQL Dump) and 26.2 (File System Level Backup) for practical backup knowledge.
-
 4. **OWASP SQL Injection Prevention Cheat Sheet:**
    [https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html](https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html)
    Essential reading for anyone building applications that interact with databases.
@@ -1394,18 +1484,17 @@ Relational databases are the safest default choice. They handle most workloads w
 
 ## Further Reading
 
+> **Advanced.** Extra documentation. Read it after the fundamentals are solid.
+
 - **MongoDB Introduction:**
   [https://www.mongodb.com/docs/manual/introduction/](https://www.mongodb.com/docs/manual/introduction/)
   A well-written introduction to document databases and MongoDB concepts.
-
 - **AWS — What Is NoSQL?:**
   [https://aws.amazon.com/nosql/](https://aws.amazon.com/nosql/)
   A clear, vendor-neutral overview of NoSQL database types and their use cases.
-
 - **PostgreSQL Documentation — JSON Types:**
   [https://www.postgresql.org/docs/current/datatype-json.html](https://www.postgresql.org/docs/current/datatype-json.html)
   Complete reference for JSON and JSONB data types in PostgreSQL.
-
 - **Redis Documentation:**
   [https://redis.io/docs/](https://redis.io/docs/)
   If you're curious about key-value stores and caching, Redis has excellent documentation.
@@ -1413,6 +1502,8 @@ Relational databases are the safest default choice. They handle most workloads w
 ---
 
 ## Summary
+
+> **Fundamentals.** This recap leads with the focus topics.
 
 This week you made the leap from database *developer* to database *administrator*. You learned to manage access with **roles and privileges**, ensuring each team member sees only what they need. You configured **authentication** through `pg_hba.conf` to control who can connect and how. You built a **backup and restore** strategy so TrailShop can survive any disaster. You confronted **SQL injection** — one of the most persistent threats in web security — and learned that **parameterized queries** are the primary defense.
 
